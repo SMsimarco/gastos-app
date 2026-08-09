@@ -1,5 +1,5 @@
 {
-  "name": "WF01 - Captura de gastos por audio + correcciones (Telegram)",
+  "name": "WF01 - Captura de gastos por audio + borrar (Telegram)",
   "active": false,
   "settings": {
     "executionOrder": "v1"
@@ -81,33 +81,11 @@
       }
     },
     {
-      "id": "n25-if-correccion-pendiente",
-      "name": "IF - Correccion pendiente",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [-760, 460],
-      "parameters": {
-        "conditions": {
-          "options": { "typeValidation": "loose" },
-          "conditions": [
-            {
-              "id": "cond-hay-pendiente",
-              "leftValue": "={{ Boolean($getWorkflowStaticData('global').pendingCorrection) }}",
-              "rightValue": "",
-              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      }
-    },
-    {
       "id": "n3-if-es-audio",
       "name": "IF - Es audio",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [-540, 560],
+      "position": [-540, 460],
       "parameters": {
         "conditions": {
           "options": { "typeValidation": "loose" },
@@ -129,7 +107,7 @@
       "name": "Telegram - Descargar audio",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [-320, 640],
+      "position": [-320, 540],
       "onError": "continueErrorOutput",
       "parameters": {
         "resource": "file",
@@ -148,7 +126,7 @@
       "name": "Code - Preparar base64",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-100, 640],
+      "position": [-100, 540],
       "onError": "continueErrorOutput",
       "parameters": {
         "language": "javaScript",
@@ -160,7 +138,7 @@
       "name": "Code - Gemini extraccion",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [120, 640],
+      "position": [120, 540],
       "onError": "continueErrorOutput",
       "parameters": {
         "language": "javaScript",
@@ -172,7 +150,7 @@
       "name": "IF - Confianza baja",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [340, 640],
+      "position": [340, 540],
       "parameters": {
         "conditions": {
           "options": { "typeValidation": "loose" },
@@ -194,7 +172,7 @@
       "name": "Code - Guardar movimiento",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [580, 760],
+      "position": [580, 660],
       "onError": "continueErrorOutput",
       "parameters": {
         "language": "javaScript",
@@ -206,7 +184,7 @@
       "name": "Telegram - Confirmar registro",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [820, 760],
+      "position": [820, 660],
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
@@ -218,14 +196,6 @@
             {
               "row": {
                 "buttons": [
-                  {
-                    "text": "✏️ Editar monto",
-                    "additionalFields": { "callback_data": "=editar_monto:{{ $json.id }}" }
-                  },
-                  {
-                    "text": "🏷 Cambiar categoría",
-                    "additionalFields": { "callback_data": "=cambiar_cat:{{ $json.id }}" }
-                  },
                   {
                     "text": "🗑 Borrar",
                     "additionalFields": { "callback_data": "=borrar:{{ $json.id }}" }
@@ -249,7 +219,7 @@
       "name": "Telegram - Pedir aclaracion",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [580, 560],
+      "position": [580, 460],
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
@@ -269,7 +239,7 @@
       "name": "Telegram - Alerta error",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [-320, 940],
+      "position": [-320, 780],
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
@@ -289,76 +259,10 @@
       "name": "Code - Parsear callback",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-540, 100],
+      "position": [-540, 140],
       "parameters": {
         "language": "javaScript",
         "jsCode": "const data = $json.callback_query.data;\nconst [accion, movimientoId] = data.split(':');\n\nreturn [{\n  json: {\n    accion,\n    movimientoId,\n    callbackQueryId: $json.callback_query.id,\n    chatId: $json.chatId,\n    messageId: $json.callback_query.message.message_id\n  }\n}];"
-      }
-    },
-    {
-      "id": "n15a-if-accion-borrar",
-      "name": "IF - Accion es borrar",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [-320, 100],
-      "parameters": {
-        "conditions": {
-          "options": { "typeValidation": "loose" },
-          "conditions": [
-            {
-              "id": "cond-accion-borrar",
-              "leftValue": "={{ $json.accion }}",
-              "rightValue": "borrar",
-              "operator": { "type": "string", "operation": "equals" }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "n15b-if-accion-editar-monto",
-      "name": "IF - Accion es editar monto",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [-100, 180],
-      "parameters": {
-        "conditions": {
-          "options": { "typeValidation": "loose" },
-          "conditions": [
-            {
-              "id": "cond-accion-editar-monto",
-              "leftValue": "={{ $json.accion }}",
-              "rightValue": "editar_monto",
-              "operator": { "type": "string", "operation": "equals" }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "n15c-if-accion-cambiar-cat",
-      "name": "IF - Accion es cambiar cat",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [120, 260],
-      "parameters": {
-        "conditions": {
-          "options": { "typeValidation": "loose" },
-          "conditions": [
-            {
-              "id": "cond-accion-cambiar-cat",
-              "leftValue": "={{ $json.accion }}",
-              "rightValue": "cambiar_cat",
-              "operator": { "type": "string", "operation": "equals" }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
       }
     },
     {
@@ -366,7 +270,7 @@
       "name": "Code - Borrar movimiento",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-100, -20],
+      "position": [-320, 140],
       "onError": "continueErrorOutput",
       "parameters": {
         "language": "javaScript",
@@ -378,7 +282,7 @@
       "name": "Telegram - Responder callback borrado",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [120, -80],
+      "position": [-100, 80],
       "parameters": {
         "resource": "callback",
         "operation": "answerQuery",
@@ -398,7 +302,7 @@
       "name": "Telegram - Editar mensaje borrado",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [120, 40],
+      "position": [-100, 200],
       "parameters": {
         "resource": "message",
         "operation": "editMessageText",
@@ -406,193 +310,6 @@
         "messageId": "={{ $json.messageId }}",
         "text": "🗑 Movimiento borrado",
         "additionalFields": {}
-      },
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CREDENTIAL_ID",
-          "name": "Telegram Bot gastos-voz"
-        }
-      }
-    },
-    {
-      "id": "n19-code-pendiente-monto",
-      "name": "Code - Guardar pendiente monto",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [120, 180],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const staticData = this.getWorkflowStaticData('global');\nstaticData.pendingCorrection = { tipo: 'monto', movimientoId: $json.movimientoId };\n\nreturn [{ json: $json }];"
-      }
-    },
-    {
-      "id": "n20-telegram-responder-callback-monto",
-      "name": "Telegram - Responder callback monto",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [340, 120],
-      "parameters": {
-        "resource": "callback",
-        "operation": "answerQuery",
-        "queryId": "={{ $json.callbackQueryId }}",
-        "additionalFields": {}
-      },
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CREDENTIAL_ID",
-          "name": "Telegram Bot gastos-voz"
-        }
-      }
-    },
-    {
-      "id": "n21-telegram-pedir-monto",
-      "name": "Telegram - Pedir nuevo monto",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [340, 240],
-      "parameters": {
-        "resource": "message",
-        "operation": "sendMessage",
-        "chatId": "={{ $json.chatId }}",
-        "text": "✏️ Mandame el nuevo monto (solo el número, ej. 3500)",
-        "additionalFields": { "appendAttribution": false }
-      },
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CREDENTIAL_ID",
-          "name": "Telegram Bot gastos-voz"
-        }
-      }
-    },
-    {
-      "id": "n22-code-listar-categorias",
-      "name": "Code - Listar categorias para elegir",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [340, 340],
-      "onError": "continueErrorOutput",
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const axios = require('axios');\nconst SUPABASE_URL = $env.SUPABASE_URL;\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst headers = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` };\n\nlet movimiento;\ntry {\n  const { data } = await axios.get(`${SUPABASE_URL}/rest/v1/movimientos`, {\n    headers, params: { id: `eq.${$json.movimientoId}`, select: 'id,tipo' }\n  });\n  movimiento = data[0];\n} catch (error) {\n  throw new Error(`No pude leer el movimiento: ${error.message}`);\n}\n\nlet categorias;\ntry {\n  const { data } = await axios.get(`${SUPABASE_URL}/rest/v1/categorias`, {\n    headers, params: { tipo: `eq.${movimiento.tipo}`, select: 'id,nombre,emoji', order: 'orden.asc' }\n  });\n  categorias = data;\n} catch (error) {\n  throw new Error(`No pude listar categorías: ${error.message}`);\n}\n\nconst staticData = this.getWorkflowStaticData('global');\nstaticData.pendingCorrection = {\n  tipo: 'categoria',\n  movimientoId: $json.movimientoId,\n  categorias: categorias.map((c) => c.id)\n};\n\nconst listaTexto = categorias.map((c, i) => `${i + 1}. ${c.emoji} ${c.nombre}`).join('\\n');\n\nreturn [{\n  json: {\n    ...$json,\n    listaTexto\n  }\n}];"
-      }
-    },
-    {
-      "id": "n23-telegram-responder-callback-cat",
-      "name": "Telegram - Responder callback cat",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [560, 300],
-      "parameters": {
-        "resource": "callback",
-        "operation": "answerQuery",
-        "queryId": "={{ $json.callbackQueryId }}",
-        "additionalFields": {}
-      },
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CREDENTIAL_ID",
-          "name": "Telegram Bot gastos-voz"
-        }
-      }
-    },
-    {
-      "id": "n24-telegram-pedir-categoria",
-      "name": "Telegram - Pedir categoria",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [560, 420],
-      "parameters": {
-        "resource": "message",
-        "operation": "sendMessage",
-        "chatId": "={{ $json.chatId }}",
-        "text": "=🏷 Elegí la categoría, respondé con el número:\n{{ $json.listaTexto }}",
-        "additionalFields": { "appendAttribution": false }
-      },
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CREDENTIAL_ID",
-          "name": "Telegram Bot gastos-voz"
-        }
-      }
-    },
-    {
-      "id": "n26-if-correccion-es-monto",
-      "name": "IF - Correccion es monto",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [-540, 460],
-      "parameters": {
-        "conditions": {
-          "options": { "typeValidation": "loose" },
-          "conditions": [
-            {
-              "id": "cond-correccion-monto",
-              "leftValue": "={{ $getWorkflowStaticData('global').pendingCorrection.tipo }}",
-              "rightValue": "monto",
-              "operator": { "type": "string", "operation": "equals" }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "n27-code-aplicar-monto",
-      "name": "Code - Aplicar nuevo monto",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-320, 400],
-      "onError": "continueErrorOutput",
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const staticData = this.getWorkflowStaticData('global');\nconst pending = staticData.pendingCorrection;\nconst texto = $json.message.text;\nconst nuevoMonto = parseFloat(texto.replace(/[^0-9.,]/g, '').replace(',', '.'));\n\nif (!nuevoMonto || nuevoMonto <= 0) {\n  return [{ json: { mensaje: '⚠️ No entendí el monto. Mandame solo el número, ej. 3500.', chatId: $json.chatId } }];\n}\n\nconst axios = require('axios');\nconst SUPABASE_URL = $env.SUPABASE_URL;\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst headers = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' };\n\ntry {\n  await axios.patch(`${SUPABASE_URL}/rest/v1/movimientos`, { monto_ars: nuevoMonto }, {\n    headers, params: { id: `eq.${pending.movimientoId}` }\n  });\n} catch (error) {\n  throw new Error(`No pude actualizar el monto: ${error.message}`);\n}\n\ndelete staticData.pendingCorrection;\n\nreturn [{ json: { mensaje: `✅ Monto actualizado a $${nuevoMonto}`, chatId: $json.chatId } }];"
-      }
-    },
-    {
-      "id": "n28-telegram-confirmar-monto",
-      "name": "Telegram - Confirmar monto actualizado",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [-100, 400],
-      "parameters": {
-        "resource": "message",
-        "operation": "sendMessage",
-        "chatId": "={{ $json.chatId }}",
-        "text": "={{ $json.mensaje }}",
-        "additionalFields": { "appendAttribution": false }
-      },
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CREDENTIAL_ID",
-          "name": "Telegram Bot gastos-voz"
-        }
-      }
-    },
-    {
-      "id": "n29-code-aplicar-categoria",
-      "name": "Code - Aplicar nueva categoria",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-320, 560],
-      "onError": "continueErrorOutput",
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const staticData = this.getWorkflowStaticData('global');\nconst pending = staticData.pendingCorrection;\nconst texto = ($json.message.text || '').trim();\nconst indice = parseInt(texto, 10) - 1;\n\nif (isNaN(indice) || indice < 0 || indice >= pending.categorias.length) {\n  return [{ json: { mensaje: '⚠️ Mandame solo el número de la lista.', chatId: $json.chatId } }];\n}\n\nconst categoriaId = pending.categorias[indice];\n\nconst axios = require('axios');\nconst SUPABASE_URL = $env.SUPABASE_URL;\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst headers = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' };\n\ntry {\n  await axios.patch(`${SUPABASE_URL}/rest/v1/movimientos`, { categoria_id: categoriaId }, {\n    headers, params: { id: `eq.${pending.movimientoId}` }\n  });\n} catch (error) {\n  throw new Error(`No pude actualizar la categoría: ${error.message}`);\n}\n\ndelete staticData.pendingCorrection;\n\nreturn [{ json: { mensaje: '✅ Categoría actualizada', chatId: $json.chatId } }];"
-      }
-    },
-    {
-      "id": "n30-telegram-confirmar-categoria",
-      "name": "Telegram - Confirmar categoria actualizada",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [-100, 560],
-      "parameters": {
-        "resource": "message",
-        "operation": "sendMessage",
-        "chatId": "={{ $json.chatId }}",
-        "text": "={{ $json.mensaje }}",
-        "additionalFields": { "appendAttribution": false }
       },
       "credentials": {
         "telegramApi": {
@@ -618,31 +335,7 @@
     "IF - Es callback": {
       "main": [
         [{ "node": "Code - Parsear callback", "type": "main", "index": 0 }],
-        [{ "node": "IF - Correccion pendiente", "type": "main", "index": 0 }]
-      ]
-    },
-    "IF - Correccion pendiente": {
-      "main": [
-        [{ "node": "IF - Correccion es monto", "type": "main", "index": 0 }],
         [{ "node": "IF - Es audio", "type": "main", "index": 0 }]
-      ]
-    },
-    "IF - Correccion es monto": {
-      "main": [
-        [{ "node": "Code - Aplicar nuevo monto", "type": "main", "index": 0 }],
-        [{ "node": "Code - Aplicar nueva categoria", "type": "main", "index": 0 }]
-      ]
-    },
-    "Code - Aplicar nuevo monto": {
-      "main": [
-        [{ "node": "Telegram - Confirmar monto actualizado", "type": "main", "index": 0 }],
-        [{ "node": "Telegram - Alerta error", "type": "main", "index": 0 }]
-      ]
-    },
-    "Code - Aplicar nueva categoria": {
-      "main": [
-        [{ "node": "Telegram - Confirmar categoria actualizada", "type": "main", "index": 0 }],
-        [{ "node": "Telegram - Alerta error", "type": "main", "index": 0 }]
       ]
     },
     "IF - Es audio": {
@@ -682,48 +375,13 @@
       ]
     },
     "Code - Parsear callback": {
-      "main": [[{ "node": "IF - Accion es borrar", "type": "main", "index": 0 }]]
-    },
-    "IF - Accion es borrar": {
-      "main": [
-        [{ "node": "Code - Borrar movimiento", "type": "main", "index": 0 }],
-        [{ "node": "IF - Accion es editar monto", "type": "main", "index": 0 }]
-      ]
+      "main": [[{ "node": "Code - Borrar movimiento", "type": "main", "index": 0 }]]
     },
     "Code - Borrar movimiento": {
       "main": [
         [
           { "node": "Telegram - Responder callback borrado", "type": "main", "index": 0 },
           { "node": "Telegram - Editar mensaje borrado", "type": "main", "index": 0 }
-        ],
-        [{ "node": "Telegram - Alerta error", "type": "main", "index": 0 }]
-      ]
-    },
-    "IF - Accion es editar monto": {
-      "main": [
-        [{ "node": "Code - Guardar pendiente monto", "type": "main", "index": 0 }],
-        [{ "node": "IF - Accion es cambiar cat", "type": "main", "index": 0 }]
-      ]
-    },
-    "Code - Guardar pendiente monto": {
-      "main": [
-        [
-          { "node": "Telegram - Responder callback monto", "type": "main", "index": 0 },
-          { "node": "Telegram - Pedir nuevo monto", "type": "main", "index": 0 }
-        ]
-      ]
-    },
-    "IF - Accion es cambiar cat": {
-      "main": [
-        [{ "node": "Code - Listar categorias para elegir", "type": "main", "index": 0 }],
-        []
-      ]
-    },
-    "Code - Listar categorias para elegir": {
-      "main": [
-        [
-          { "node": "Telegram - Responder callback cat", "type": "main", "index": 0 },
-          { "node": "Telegram - Pedir categoria", "type": "main", "index": 0 }
         ],
         [{ "node": "Telegram - Alerta error", "type": "main", "index": 0 }]
       ]
