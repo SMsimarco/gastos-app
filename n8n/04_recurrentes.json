@@ -1,0 +1,115 @@
+{
+  "name": "WF04 - Recurrentes diario",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires"
+  },
+  "nodes": [
+    {
+      "id": "n1-schedule",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-600, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "15 7 * * *" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n2-code-recurrentes",
+      "name": "Code - Cargar recurrentes del dia",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-380, 300],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const axios = require('axios');\nconst SUPABASE_URL = $env.SUPABASE_URL;\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst headers = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' };\n\nconst hoyAR = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });\nconst diaDelMes = parseInt(hoyAR.split('-')[2], 10);\n\nlet recurrentes;\ntry {\n  const { data } = await axios.get(`${SUPABASE_URL}/rest/v1/recurrentes`, {\n    headers,\n    params: { activo: 'eq.true', dia_del_mes: `eq.${diaDelMes}`, select: '*' }\n  });\n  recurrentes = data;\n} catch (error) {\n  throw new Error(`No pude leer recurrentes: ${error.message}`);\n}\n\nconst pendientes = recurrentes.filter((r) => r.ultima_ejecucion !== hoyAR);\n\nlet tcUsado = null;\ntry {\n  const { data: tcRows } = await axios.get(`${SUPABASE_URL}/rest/v1/tipo_cambio`, {\n    headers, params: { select: 'oficial_venta', order: 'fecha.desc', limit: 1 }\n  });\n  if (tcRows.length > 0) tcUsado = tcRows[0].oficial_venta;\n} catch (error) {\n  tcUsado = null;\n}\n\nconst insertados = [];\nfor (const r of pendientes) {\n  const montoUsd = tcUsado ? Number((r.monto / tcUsado).toFixed(2)) : null;\n  const payload = {\n    tipo: 'gasto',\n    fecha: hoyAR,\n    monto_ars: r.monto,\n    monto_usd: montoUsd,\n    tc_usado: tcUsado,\n    moneda_origen: 'ARS',\n    categoria_id: r.categoria_id,\n    comercio: null,\n    descripcion: r.descripcion,\n    metodo_pago: r.metodo_pago,\n    cuotas_total: 1,\n    cuota_nro: 1,\n    fuente: 'recurrente',\n    transcripcion_raw: null,\n    confianza: 'alta'\n  };\n\n  try {\n    await axios.post(`${SUPABASE_URL}/rest/v1/movimientos`, payload, {\n      headers: { ...headers, Prefer: 'return=minimal' }\n    });\n    await axios.patch(`${SUPABASE_URL}/rest/v1/recurrentes`, { ultima_ejecucion: hoyAR }, {\n      headers, params: { id: `eq.${r.id}` }\n    });\n    insertados.push(`${r.descripcion} — $${r.monto}`);\n  } catch (error) {\n    throw new Error(`No pude cargar el recurrente \"${r.descripcion}\": ${error.message}`);\n  }\n}\n\nreturn [{ json: { cantidad: insertados.length, lista: insertados.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "n3-if-hay-recurrentes",
+      "name": "IF - Hay recurrentes hoy",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-160, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-cantidad",
+              "leftValue": "={{ $json.cantidad }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n4-telegram-notificar",
+      "name": "Telegram - Notificar recurrentes",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [60, 260],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.MY_TELEGRAM_CHAT_ID }}",
+        "text": "=📌 Recurrentes cargados hoy:\n{{ $json.lista }}",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot gastos-voz"
+        }
+      }
+    },
+    {
+      "id": "n5-telegram-error",
+      "name": "Telegram - Alerta error recurrentes",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-380, 460],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.MY_TELEGRAM_CHAT_ID }}",
+        "text": "=⚠️ WF04 no pudo cargar los recurrentes de hoy\n{{ $json.error?.message || JSON.stringify($json.error) || 'error desconocido' }}",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot gastos-voz"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "Code - Cargar recurrentes del dia", "type": "main", "index": 0 }]]
+    },
+    "Code - Cargar recurrentes del dia": {
+      "main": [
+        [{ "node": "IF - Hay recurrentes hoy", "type": "main", "index": 0 }],
+        [{ "node": "Telegram - Alerta error recurrentes", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF - Hay recurrentes hoy": {
+      "main": [
+        [{ "node": "Telegram - Notificar recurrentes", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  }
+}

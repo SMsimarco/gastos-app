@@ -1,0 +1,67 @@
+{
+  "name": "WF05 - Tipo de cambio diario",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires"
+  },
+  "nodes": [
+    {
+      "id": "n1-schedule",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-600, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 7 * * *" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n2-code-tc",
+      "name": "Code - Actualizar tipo de cambio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-380, 300],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const axios = require('axios');\nconst SUPABASE_URL = $env.SUPABASE_URL;\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst headers = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' };\n\nlet blueVenta;\nlet oficialVenta;\ntry {\n  const { data } = await axios.get('https://dolarapi.com/v1/dolares', { timeout: 15000 });\n  const blue = data.find((d) => d.casa === 'blue');\n  const oficial = data.find((d) => d.casa === 'oficial');\n  if (!blue || !oficial) throw new Error('dolarapi no devolvio blue/oficial');\n  blueVenta = blue.venta;\n  oficialVenta = oficial.venta;\n} catch (error) {\n  throw new Error(`No pude obtener el tipo de cambio: ${error.message}`);\n}\n\nconst hoyAR = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });\n\ntry {\n  await axios.post(`${SUPABASE_URL}/rest/v1/tipo_cambio`, {\n    fecha: hoyAR,\n    blue_venta: blueVenta,\n    oficial_venta: oficialVenta\n  }, {\n    headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' }\n  });\n} catch (error) {\n  throw new Error(`No pude guardar el tipo de cambio: ${error.message}`);\n}\n\nreturn [{ json: { blueVenta, oficialVenta, fecha: hoyAR } }];"
+      }
+    },
+    {
+      "id": "n3-telegram-error",
+      "name": "Telegram - Alerta error TC",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-380, 460],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.MY_TELEGRAM_CHAT_ID }}",
+        "text": "=⚠️ WF05 no pudo actualizar el tipo de cambio hoy\n{{ $json.error?.message || JSON.stringify($json.error) || 'error desconocido' }}\n\nSe va a seguir usando el último valor guardado hasta que esto se resuelva.",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot gastos-voz"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "Code - Actualizar tipo de cambio", "type": "main", "index": 0 }]]
+    },
+    "Code - Actualizar tipo de cambio": {
+      "main": [
+        [],
+        [{ "node": "Telegram - Alerta error TC", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}
