@@ -189,7 +189,7 @@
         "resource": "message",
         "operation": "sendMessage",
         "chatId": "={{ $env.MY_TELEGRAM_CHAT_ID }}",
-        "text": "=✅ Registrado\n{{ $json.categoriaEmoji }} {{ $json.categoriaNombre }} · ${{ $json.monto_ars }} · {{ $json.fecha }} · {{ $json.metodo_pago || 'sin especificar' }}",
+        "text": "=✅ Registrado\n{{ $json.categoriaEmoji }} {{ $json.categoriaNombre }} — {{ $json.descripcion }}\n${{ $json.monto_ars }} · {{ $json.fecha }} · {{ $json.metodo_pago || 'sin especificar' }}",
         "replyMarkup": "inlineKeyboard",
         "inlineKeyboard": {
           "rows": [
