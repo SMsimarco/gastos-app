@@ -1,5 +1,5 @@
 {
-  "name": "WF01 - Captura de gastos por audio + borrar (Telegram)",
+  "name": "WF01 - Captura de gastos (audio + texto + foto) + borrar (Telegram)",
   "active": false,
   "settings": {
     "executionOrder": "v1"
@@ -103,11 +103,55 @@
       }
     },
     {
+      "id": "n31-if-es-foto",
+      "name": "IF - Es foto",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-320, 700],
+      "parameters": {
+        "conditions": {
+          "options": { "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-photo-exists",
+              "leftValue": "={{ Boolean($json.message.photo) }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n34-if-es-texto",
+      "name": "IF - Es texto",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-100, 820],
+      "parameters": {
+        "conditions": {
+          "options": { "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-text-exists",
+              "leftValue": "={{ Boolean($json.message.text) }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
       "id": "n4-telegram-descargar",
       "name": "Telegram - Descargar audio",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [-320, 540],
+      "position": [-320, 460],
       "onError": "continueErrorOutput",
       "parameters": {
         "resource": "file",
@@ -123,14 +167,56 @@
     },
     {
       "id": "n5-code-base64",
-      "name": "Code - Preparar base64",
+      "name": "Code - Preparar base64 audio",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-100, 540],
+      "position": [-100, 460],
       "onError": "continueErrorOutput",
       "parameters": {
         "language": "javaScript",
-        "jsCode": "const binaryBuffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst base64Audio = binaryBuffer.toString('base64');\n\nreturn [{\n  json: {\n    base64Audio,\n    mimeType: 'audio/ogg'\n  }\n}];"
+        "jsCode": "const binaryBuffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst base64Data = binaryBuffer.toString('base64');\n\nreturn [{\n  json: {\n    base64Data,\n    mimeType: 'audio/ogg',\n    fuente: 'audio'\n  }\n}];"
+      }
+    },
+    {
+      "id": "n32-telegram-descargar-foto",
+      "name": "Telegram - Descargar foto",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-100, 700],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $json.message.photo[$json.message.photo.length - 1].file_id }}"
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot gastos-voz"
+        }
+      }
+    },
+    {
+      "id": "n33-code-base64-foto",
+      "name": "Code - Preparar base64 foto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, 700],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const binaryBuffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst base64Data = binaryBuffer.toString('base64');\n\nreturn [{\n  json: {\n    base64Data,\n    mimeType: 'image/jpeg',\n    fuente: 'foto'\n  }\n}];"
+      }
+    },
+    {
+      "id": "n35-code-preparar-texto",
+      "name": "Code - Preparar texto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, 820],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "return [{\n  json: {\n    textoMensaje: $json.message.text,\n    fuente: 'texto'\n  }\n}];"
       }
     },
     {
@@ -138,11 +224,11 @@
       "name": "Code - Gemini extraccion",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [120, 540],
+      "position": [360, 600],
       "onError": "continueErrorOutput",
       "parameters": {
         "language": "javaScript",
-        "jsCode": "const axios = require('axios');\n\nconst base64Audio = $json.base64Audio;\nconst mimeType = $json.mimeType;\n\nconst fechaHoyAR = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });\n\nconst categoriasGasto = ['Supermercado', 'Delivery/Restaurantes', 'Alimentos', 'Transporte/Nafta', 'Servicios', 'Alquiler', 'Salud', 'Ocio', 'Ropa', 'Educación', 'Suscripciones', 'Impuestos', 'Otros'];\nconst categoriasIngreso = ['Clientes', 'Sueldo', 'Ventas', 'Otros'];\n\nconst prompt = `Sos un extractor de movimientos financieros a partir de audio en español rioplatense (Argentina).\nFecha de hoy: ${fechaHoyAR} (timezone America/Argentina/Buenos_Aires). Resolvé fechas relativas (\"ayer\", \"el viernes pasado\") contra esta fecha, nunca uses UTC.\n\nUn audio puede contener uno o varios movimientos (gasto o ingreso). Devolvé SIEMPRE un array, uno por movimiento. Si el audio no contiene ningún movimiento financiero, devolvé un array vacío [].\n\nReglas de argot monetario argentino:\n- \"20 lucas\" = 20000\n- \"2 palos\" = 2000000\n- \"500 mangos\" = 500\n- \"un verde\" = 1 USD (y en general \"verdes\" = dólares)\n- \"facturas\" (en contexto de compra de comida) son medialunas/pastelitos de panadería, NO boletas de servicios\n\nCompras de comida que NO son supermercado ni delivery/restaurante (panadería, verdulería, carnicería, kiosco, almacén) van en categoria \"Alimentos\". Poné en descripcion el detalle específico (ej. \"facturas de panadería\", \"verdura\", \"fiambre\") para poder diferenciar cada compra aunque compartan categoría.\n\nCategorías válidas para tipo=gasto: ${categoriasGasto.join(', ')}\nCategorías válidas para tipo=ingreso: ${categoriasIngreso.join(', ')}\n\nSi NO podés determinar el monto con confianza razonable, poné confianza \"baja\" y NO inventes un número (poné monto en 0).\nGuardá siempre en transcripcion_raw una transcripción fiel de lo que se dijo.`;\n\nconst responseSchema = {\n  type: 'ARRAY',\n  items: {\n    type: 'OBJECT',\n    properties: {\n      tipo: { type: 'STRING', enum: ['gasto', 'ingreso'] },\n      monto: { type: 'NUMBER' },\n      moneda: { type: 'STRING', enum: ['ARS', 'USD'] },\n      descripcion: { type: 'STRING' },\n      comercio: { type: 'STRING', nullable: true },\n      categoria: { type: 'STRING' },\n      metodo_pago: { type: 'STRING', enum: ['efectivo', 'debito', 'credito', 'transferencia', 'mercadopago'], nullable: true },\n      cuotas: { type: 'INTEGER' },\n      fecha: { type: 'STRING' },\n      confianza: { type: 'STRING', enum: ['alta', 'media', 'baja'] },\n      transcripcion_raw: { type: 'STRING' }\n    },\n    required: ['tipo', 'monto', 'moneda', 'descripcion', 'categoria', 'cuotas', 'fecha', 'confianza', 'transcripcion_raw']\n  }\n};\n\nlet movimientos;\ntry {\n  const { data } = await axios.post(\n    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',\n    {\n      contents: [{\n        parts: [\n          { text: prompt },\n          { inlineData: { mimeType, data: base64Audio } }\n        ]\n      }],\n      generationConfig: {\n        responseMimeType: 'application/json',\n        responseSchema\n      }\n    },\n    {\n      headers: {\n        'Content-Type': 'application/json',\n        'x-goog-api-key': $env.GEMINI_API_KEY\n      },\n      timeout: 30000\n    }\n  );\n\n  const textoRespuesta = data.candidates[0].content.parts[0].text;\n  movimientos = JSON.parse(textoRespuesta);\n} catch (error) {\n  throw new Error(`Gemini falló: ${error.message}`);\n}\n\nreturn movimientos.map((m) => ({ json: m }));"
+        "jsCode": "const axios = require('axios');\n\nconst base64Data = $json.base64Data || null;\nconst mimeType = $json.mimeType || null;\nconst textoMensaje = $json.textoMensaje || null;\nconst fuente = $json.fuente;\n\nconst fechaHoyAR = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });\n\nconst categoriasGasto = ['Supermercado', 'Delivery/Restaurantes', 'Alimentos', 'Transporte/Nafta', 'Servicios', 'Alquiler', 'Salud', 'Ocio', 'Ropa', 'Educación', 'Suscripciones', 'Impuestos', 'Otros'];\nconst categoriasIngreso = ['Clientes', 'Sueldo', 'Ventas', 'Otros'];\n\nconst prompt = `Sos un extractor de movimientos financieros a partir de un mensaje de Telegram (audio, foto de ticket, o texto) en español rioplatense (Argentina).\nFecha de hoy: ${fechaHoyAR} (timezone America/Argentina/Buenos_Aires). Resolvé fechas relativas (\"ayer\", \"el viernes pasado\") contra esta fecha, nunca uses UTC.\n\nSi te llega una imagen, es una foto de un ticket/factura de compra: leé el total, el comercio y la fecha del ticket si están visibles.\n\nUn mensaje puede contener uno o varios movimientos (gasto o ingreso). Devolvé SIEMPRE un array, uno por movimiento. Si el mensaje no contiene ningún movimiento financiero, devolvé un array vacío [].\n\nReglas de argot monetario argentino:\n- \"20 lucas\" = 20000\n- \"2 palos\" = 2000000\n- \"500 mangos\" = 500\n- \"un verde\" = 1 USD (y en general \"verdes\" = dólares)\n- \"facturas\" (en contexto de compra de comida) son medialunas/pastelitos de panadería, NO boletas de servicios\n\nCompras de comida que NO son supermercado ni delivery/restaurante (panadería, verdulería, carnicería, kiosco, almacén) van en categoria \"Alimentos\". Poné en descripcion el detalle específico (ej. \"facturas de panadería\", \"verdura\", \"fiambre\") para poder diferenciar cada compra aunque compartan categoría.\n\nCategorías válidas para tipo=gasto: ${categoriasGasto.join(', ')}\nCategorías válidas para tipo=ingreso: ${categoriasIngreso.join(', ')}\n\nSi NO podés determinar el monto con confianza razonable, poné confianza \"baja\" y NO inventes un número (poné monto en 0).\nGuardá siempre en transcripcion_raw una transcripción fiel de lo que se dijo o del texto/ticket recibido.`;\n\nconst responseSchema = {\n  type: 'ARRAY',\n  items: {\n    type: 'OBJECT',\n    properties: {\n      tipo: { type: 'STRING', enum: ['gasto', 'ingreso'] },\n      monto: { type: 'NUMBER' },\n      moneda: { type: 'STRING', enum: ['ARS', 'USD'] },\n      descripcion: { type: 'STRING' },\n      comercio: { type: 'STRING', nullable: true },\n      categoria: { type: 'STRING' },\n      metodo_pago: { type: 'STRING', enum: ['efectivo', 'debito', 'credito', 'transferencia', 'mercadopago'], nullable: true },\n      cuotas: { type: 'INTEGER' },\n      fecha: { type: 'STRING' },\n      confianza: { type: 'STRING', enum: ['alta', 'media', 'baja'] },\n      transcripcion_raw: { type: 'STRING' }\n    },\n    required: ['tipo', 'monto', 'moneda', 'descripcion', 'categoria', 'cuotas', 'fecha', 'confianza', 'transcripcion_raw']\n  }\n};\n\nconst parts = [{ text: prompt }];\nif (base64Data) {\n  parts.push({ inlineData: { mimeType, data: base64Data } });\n} else if (textoMensaje) {\n  parts.push({ text: `Mensaje del usuario: \"${textoMensaje}\"` });\n}\n\nlet movimientos;\ntry {\n  const { data } = await axios.post(\n    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',\n    {\n      contents: [{ parts }],\n      generationConfig: {\n        responseMimeType: 'application/json',\n        responseSchema\n      }\n    },\n    {\n      headers: {\n        'Content-Type': 'application/json',\n        'x-goog-api-key': $env.GEMINI_API_KEY\n      },\n      timeout: 30000\n    }\n  );\n\n  const textoRespuesta = data.candidates[0].content.parts[0].text;\n  movimientos = JSON.parse(textoRespuesta);\n} catch (error) {\n  throw new Error(`Gemini falló: ${error.message}`);\n}\n\nreturn movimientos.map((m) => ({ json: { ...m, fuente } }));"
       }
     },
     {
@@ -150,7 +236,7 @@
       "name": "IF - Confianza baja",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [340, 540],
+      "position": [580, 600],
       "parameters": {
         "conditions": {
           "options": { "typeValidation": "loose" },
@@ -172,11 +258,11 @@
       "name": "Code - Guardar movimiento",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [580, 660],
+      "position": [820, 720],
       "onError": "continueErrorOutput",
       "parameters": {
         "language": "javaScript",
-        "jsCode": "const axios = require('axios');\nconst item = $json;\n\nconst SUPABASE_URL = $env.SUPABASE_URL;\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\n\nconst supabaseHeaders = {\n  apikey: SERVICE_KEY,\n  Authorization: `Bearer ${SERVICE_KEY}`,\n  'Content-Type': 'application/json'\n};\n\nlet categoriaId = null;\nlet categoriaEmoji = '📦';\nlet categoriaNombre = item.categoria;\nlet reglaAplicada = false;\n\ntry {\n  const { data: reglas } = await axios.get(`${SUPABASE_URL}/rest/v1/reglas_comercio`, {\n    headers: supabaseHeaders,\n    params: { select: 'patron,categorias(id,emoji,nombre)' }\n  });\n  const textoBusqueda = `${item.comercio || ''} ${item.descripcion || ''}`.toLowerCase();\n  const regla = reglas.find((r) => textoBusqueda.includes(r.patron.toLowerCase()));\n  if (regla && regla.categorias) {\n    categoriaId = regla.categorias.id;\n    categoriaEmoji = regla.categorias.emoji;\n    categoriaNombre = regla.categorias.nombre;\n    reglaAplicada = true;\n  }\n} catch (error) {\n  reglaAplicada = false;\n}\n\nif (!reglaAplicada) {\n  try {\n    const { data: categorias } = await axios.get(`${SUPABASE_URL}/rest/v1/categorias`, {\n      headers: supabaseHeaders,\n      params: { nombre: `eq.${item.categoria}`, tipo: `eq.${item.tipo}`, select: 'id,emoji,nombre' }\n    });\n    if (categorias.length > 0) {\n      categoriaId = categorias[0].id;\n      categoriaEmoji = categorias[0].emoji;\n      categoriaNombre = categorias[0].nombre;\n    }\n  } catch (error) {\n    throw new Error(`No pude buscar la categoría en Supabase: ${error.message}`);\n  }\n}\n\nlet tcUsado = null;\ntry {\n  const { data: tcRows } = await axios.get(`${SUPABASE_URL}/rest/v1/tipo_cambio`, {\n    headers: supabaseHeaders,\n    params: { select: 'oficial_venta', order: 'fecha.desc', limit: 1 }\n  });\n  if (tcRows.length > 0) tcUsado = tcRows[0].oficial_venta;\n} catch (error) {\n  tcUsado = null;\n}\n\nlet montoArs;\nlet montoUsd;\nif (item.moneda === 'ARS') {\n  montoArs = item.monto;\n  montoUsd = tcUsado ? Number((item.monto / tcUsado).toFixed(2)) : null;\n} else {\n  montoUsd = item.monto;\n  montoArs = tcUsado ? Number((item.monto * tcUsado).toFixed(2)) : item.monto;\n}\n\nconst payload = {\n  tipo: item.tipo,\n  fecha: item.fecha,\n  monto_ars: montoArs,\n  monto_usd: montoUsd,\n  tc_usado: tcUsado,\n  moneda_origen: item.moneda,\n  categoria_id: categoriaId,\n  comercio: item.comercio || null,\n  descripcion: item.descripcion,\n  metodo_pago: item.metodo_pago || null,\n  cuotas_total: 1,\n  cuota_nro: 1,\n  fuente: 'audio',\n  transcripcion_raw: item.transcripcion_raw,\n  confianza: item.confianza\n};\n\nlet inserted;\ntry {\n  const { data } = await axios.post(`${SUPABASE_URL}/rest/v1/movimientos`, payload, {\n    headers: { ...supabaseHeaders, Prefer: 'return=representation' }\n  });\n  inserted = data[0];\n} catch (error) {\n  throw new Error(`No pude insertar el movimiento en Supabase: ${error.message}`);\n}\n\nreturn [{\n  json: {\n    ...inserted,\n    categoriaEmoji,\n    categoriaNombre\n  }\n}];"
+        "jsCode": "const axios = require('axios');\nconst item = $json;\n\nconst SUPABASE_URL = $env.SUPABASE_URL;\nconst SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\n\nconst supabaseHeaders = {\n  apikey: SERVICE_KEY,\n  Authorization: `Bearer ${SERVICE_KEY}`,\n  'Content-Type': 'application/json'\n};\n\nlet categoriaId = null;\nlet categoriaEmoji = '📦';\nlet categoriaNombre = item.categoria;\nlet reglaAplicada = false;\n\ntry {\n  const { data: reglas } = await axios.get(`${SUPABASE_URL}/rest/v1/reglas_comercio`, {\n    headers: supabaseHeaders,\n    params: { select: 'patron,categorias(id,emoji,nombre)' }\n  });\n  const textoBusqueda = `${item.comercio || ''} ${item.descripcion || ''}`.toLowerCase();\n  const regla = reglas.find((r) => textoBusqueda.includes(r.patron.toLowerCase()));\n  if (regla && regla.categorias) {\n    categoriaId = regla.categorias.id;\n    categoriaEmoji = regla.categorias.emoji;\n    categoriaNombre = regla.categorias.nombre;\n    reglaAplicada = true;\n  }\n} catch (error) {\n  reglaAplicada = false;\n}\n\nif (!reglaAplicada) {\n  try {\n    const { data: categorias } = await axios.get(`${SUPABASE_URL}/rest/v1/categorias`, {\n      headers: supabaseHeaders,\n      params: { nombre: `eq.${item.categoria}`, tipo: `eq.${item.tipo}`, select: 'id,emoji,nombre' }\n    });\n    if (categorias.length > 0) {\n      categoriaId = categorias[0].id;\n      categoriaEmoji = categorias[0].emoji;\n      categoriaNombre = categorias[0].nombre;\n    }\n  } catch (error) {\n    throw new Error(`No pude buscar la categoría en Supabase: ${error.message}`);\n  }\n}\n\nlet tcUsado = null;\ntry {\n  const { data: tcRows } = await axios.get(`${SUPABASE_URL}/rest/v1/tipo_cambio`, {\n    headers: supabaseHeaders,\n    params: { select: 'oficial_venta', order: 'fecha.desc', limit: 1 }\n  });\n  if (tcRows.length > 0) tcUsado = tcRows[0].oficial_venta;\n} catch (error) {\n  tcUsado = null;\n}\n\nlet montoArs;\nlet montoUsd;\nif (item.moneda === 'ARS') {\n  montoArs = item.monto;\n  montoUsd = tcUsado ? Number((item.monto / tcUsado).toFixed(2)) : null;\n} else {\n  montoUsd = item.monto;\n  montoArs = tcUsado ? Number((item.monto * tcUsado).toFixed(2)) : item.monto;\n}\n\nconst payload = {\n  tipo: item.tipo,\n  fecha: item.fecha,\n  monto_ars: montoArs,\n  monto_usd: montoUsd,\n  tc_usado: tcUsado,\n  moneda_origen: item.moneda,\n  categoria_id: categoriaId,\n  comercio: item.comercio || null,\n  descripcion: item.descripcion,\n  metodo_pago: item.metodo_pago || null,\n  cuotas_total: 1,\n  cuota_nro: 1,\n  fuente: item.fuente || 'texto',\n  transcripcion_raw: item.transcripcion_raw,\n  confianza: item.confianza\n};\n\nlet inserted;\ntry {\n  const { data } = await axios.post(`${SUPABASE_URL}/rest/v1/movimientos`, payload, {\n    headers: { ...supabaseHeaders, Prefer: 'return=representation' }\n  });\n  inserted = data[0];\n} catch (error) {\n  throw new Error(`No pude insertar el movimiento en Supabase: ${error.message}`);\n}\n\nreturn [{\n  json: {\n    ...inserted,\n    categoriaEmoji,\n    categoriaNombre\n  }\n}];"
       }
     },
     {
@@ -184,7 +270,7 @@
       "name": "Telegram - Confirmar registro",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [820, 660],
+      "position": [1060, 720],
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
@@ -219,12 +305,12 @@
       "name": "Telegram - Pedir aclaracion",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [580, 460],
+      "position": [820, 600],
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
         "chatId": "={{ $env.MY_TELEGRAM_CHAT_ID }}",
-        "text": "=🤔 Escuché esto pero no estoy seguro del monto:\n\"{{ $json.transcripcion_raw }}\"\n\nMandame de nuevo aclarando el monto (ej. \"800 pesos\" en vez de \"unos mangos\"). No lo registré todavía.",
+        "text": "=🤔 Esto no me quedó claro:\n\"{{ $json.transcripcion_raw }}\"\n\nMandame de nuevo aclarando el monto (ej. \"800 pesos\" en vez de \"unos mangos\"). No lo registré todavía.",
         "additionalFields": { "appendAttribution": false }
       },
       "credentials": {
@@ -239,12 +325,12 @@
       "name": "Telegram - Alerta error",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [-320, 780],
+      "position": [-320, 940],
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
         "chatId": "={{ $env.MY_TELEGRAM_CHAT_ID }}",
-        "text": "=⚠️ Error en WF01 (captura audio)\n{{ $json.error?.message || JSON.stringify($json.error) || 'error desconocido' }}",
+        "text": "=⚠️ Error en WF01 (captura)\n{{ $json.error?.message || JSON.stringify($json.error) || 'error desconocido' }}",
         "additionalFields": { "appendAttribution": false }
       },
       "credentials": {
@@ -341,20 +427,47 @@
     "IF - Es audio": {
       "main": [
         [{ "node": "Telegram - Descargar audio", "type": "main", "index": 0 }],
+        [{ "node": "IF - Es foto", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF - Es foto": {
+      "main": [
+        [{ "node": "Telegram - Descargar foto", "type": "main", "index": 0 }],
+        [{ "node": "IF - Es texto", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF - Es texto": {
+      "main": [
+        [{ "node": "Code - Preparar texto", "type": "main", "index": 0 }],
         []
       ]
     },
     "Telegram - Descargar audio": {
       "main": [
-        [{ "node": "Code - Preparar base64", "type": "main", "index": 0 }],
+        [{ "node": "Code - Preparar base64 audio", "type": "main", "index": 0 }],
         [{ "node": "Telegram - Alerta error", "type": "main", "index": 0 }]
       ]
     },
-    "Code - Preparar base64": {
+    "Telegram - Descargar foto": {
+      "main": [
+        [{ "node": "Code - Preparar base64 foto", "type": "main", "index": 0 }],
+        [{ "node": "Telegram - Alerta error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code - Preparar base64 audio": {
       "main": [
         [{ "node": "Code - Gemini extraccion", "type": "main", "index": 0 }],
         [{ "node": "Telegram - Alerta error", "type": "main", "index": 0 }]
       ]
+    },
+    "Code - Preparar base64 foto": {
+      "main": [
+        [{ "node": "Code - Gemini extraccion", "type": "main", "index": 0 }],
+        [{ "node": "Telegram - Alerta error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code - Preparar texto": {
+      "main": [[{ "node": "Code - Gemini extraccion", "type": "main", "index": 0 }]]
     },
     "Code - Gemini extraccion": {
       "main": [
