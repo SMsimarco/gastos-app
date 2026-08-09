@@ -2,16 +2,7 @@
 
 Sistema personal de registro de gastos e ingresos. Captura principal por audio de Telegram, visualización en PWA. Un solo usuario, sin SaaS.
 
-## Estado actual
-
-- [x] Schema de Supabase (`supabase/migrations/`)
-- [x] WF01 rama audio (`n8n/01_captura_audio.json`)
-- [ ] Confirmación con botones inline (callbacks — WF02, pendiente)
-- [ ] WF01 ramas texto y foto
-- [ ] WF04 recurrentes, WF05 tipo de cambio
-- [ ] Cuotas
-- [ ] PWA
-- [ ] WF03 consultas, WF06 digest
+Arquitectura: Telegram (audio/texto/foto) → n8n → Gemini Flash (extracción estructurada) → Supabase → PWA con gráficos.
 
 Ver `NOTES.md` para el detalle de verificación de la API de Gemini (modelo, endpoint, structured output).
 
@@ -73,7 +64,7 @@ Mandale un audio a tu bot diciendo algo simple: *"cargué 20 lucas de nafta en e
 
 - Que `Code - Gemini extraccion` devuelva el JSON esperado (abrí la ejecución en n8n y mirá el output del nodo).
 - Que se haya insertado la fila en `movimientos` en Supabase.
-- Que te llegue el mensaje de confirmación con los 3 botones (los botones todavía no hacen nada — el callback handler es WF02, pendiente).
+- Que te llegue el mensaje de confirmación con los 3 botones.
 - Probá también un audio ambiguo tipo *"gasté algo de plata"* → debería responder pidiendo aclaración, sin insertar nada.
 
 Si Gemini rechaza el audio OGG de Telegram (poco probable según la doc, pero puede pasar con algún códec raro), hay que agregar un paso de conversión a MP3 con ffmpeg vía Execute Command antes del nodo `Code - Gemini extraccion` — no está implementado todavía porque no se puede confirmar que haga falta sin probar con audio real primero.
