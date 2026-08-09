@@ -180,7 +180,7 @@
             }
           ]
         },
-        "additionalFields": {}
+        "additionalFields": { "appendAttribution": false }
       },
       "credentials": {
         "telegramApi": {
@@ -200,7 +200,7 @@
         "operation": "sendMessage",
         "chatId": "={{ $env.MY_TELEGRAM_CHAT_ID }}",
         "text": "=🤔 Escuché esto pero no estoy seguro del monto:\n\"{{ $json.transcripcion_raw }}\"\n\nMandame de nuevo aclarando el monto (ej. \"800 pesos\" en vez de \"unos mangos\"). No lo registré todavía.",
-        "additionalFields": {}
+        "additionalFields": { "appendAttribution": false }
       },
       "credentials": {
         "telegramApi": {
@@ -220,7 +220,7 @@
         "operation": "sendMessage",
         "chatId": "={{ $env.MY_TELEGRAM_CHAT_ID }}",
         "text": "=⚠️ Error en WF01 (captura audio)\n{{ $json.error?.message || JSON.stringify($json.error) || 'error desconocido' }}",
-        "additionalFields": {}
+        "additionalFields": { "appendAttribution": false }
       },
       "credentials": {
         "telegramApi": {
