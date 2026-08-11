@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { crearClienteBrowser } from "@/lib/supabase/client";
-import { IconMic } from "@/components/icons";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,16 +33,12 @@ export default function LoginPage() {
   return (
     <main className="flex-1 flex items-center justify-center p-6">
       <form onSubmit={handleSubmit} className="w-full max-w-sm flex flex-col gap-4">
-        <div className="flex flex-col items-center gap-4 mb-2">
+        <div className="flex justify-center mb-2">
           <div
-            className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center text-black"
-            style={{ boxShadow: "0 8px 24px -8px rgba(52,211,153,0.5)" }}
+            className="rounded-2xl overflow-hidden bg-[#faf9f5] p-4"
+            style={{ boxShadow: "0 12px 32px -12px rgba(52,211,153,0.35)" }}
           >
-            <IconMic size={28} />
-          </div>
-          <div className="text-center">
-            <h1 className="text-xl font-semibold tracking-tight">gastos-voz</h1>
-            <p className="text-muted text-sm mt-0.5">Registrá tus gastos hablando</p>
+            <Image src="/logo-full.png" alt="gastos-voz" width={220} height={121} priority />
           </div>
         </div>
 
