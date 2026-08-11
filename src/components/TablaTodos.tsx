@@ -275,7 +275,7 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
               >
                 <div className="min-w-0">
                   <p className="font-medium truncate">
-                    {m.categorias?.emoji ?? "📦"} {m.categorias?.nombre ?? "Sin categoría"} — {m.descripcion}
+                    {m.categorias?.emoji ?? "📦"} {m.descripcion}
                   </p>
                   <p className="text-muted text-sm">
                     {m.fecha}

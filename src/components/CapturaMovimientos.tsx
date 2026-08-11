@@ -285,7 +285,7 @@ export function CapturaMovimientos({
           >
             <div className="min-w-0">
               <p className="font-medium truncate">
-                {m.categoriaEmoji ?? "📦"} {m.categoriaNombre ?? ""} — {m.descripcion}
+                {m.categoriaEmoji ?? "📦"} {m.descripcion}
               </p>
               <p className="text-muted text-sm">
                 {m.fecha}

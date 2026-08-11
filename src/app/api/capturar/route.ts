@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
       await enviarPush(supabaseServicio, user.id, {
         title: "Registrado",
-        body: `${guardado.categoriaEmoji} ${guardado.categoriaNombre} — ${guardado.descripcion}\n$${guardado.monto_ars} · ${guardado.fecha}${infoCuotas}${infoDuplicado}`,
+        body: `${guardado.categoriaEmoji} ${guardado.descripcion}\n$${guardado.monto_ars} · ${guardado.fecha}${infoCuotas}${infoDuplicado}`,
       });
 
       if (guardado.tipo === "gasto" && guardado.categoria_id) {
