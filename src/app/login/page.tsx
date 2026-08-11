@@ -52,9 +52,9 @@ function LoginForm() {
     <main className="flex-1 flex items-center justify-center p-6">
       <form onSubmit={handleSubmit} className="w-full max-w-sm flex flex-col gap-4">
         <div className="flex flex-col items-center gap-3 mb-2">
-          <Image src="/icon-512.png" alt="gastos-voz" width={88} height={88} priority />
+          <Image src="/icon-512.png" alt="Gastos" width={88} height={88} priority />
           <div className="text-center">
-            <h1 className="text-xl font-semibold tracking-tight">gastos-voz</h1>
+            <h1 className="text-xl font-semibold tracking-tight">Gastos</h1>
             <p className="text-muted text-sm mt-0.5">Registrá tus gastos por voz, escribiendo o con una foto de tu ticket</p>
           </div>
         </div>

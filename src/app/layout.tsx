@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "gastos-voz",
+  title: "Gastos",
   description: "Registro personal de gastos por voz",
   manifest: "/manifest.json",
   icons: {
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "gastos-voz",
+    title: "Gastos",
   },
 };
 

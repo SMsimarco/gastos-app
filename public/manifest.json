@@ -1,6 +1,6 @@
 {
-  "name": "gastos-voz",
-  "short_name": "gastos-voz",
+  "name": "Gastos",
+  "short_name": "Gastos",
   "description": "Registro personal de gastos por voz",
   "start_url": "/",
   "display": "standalone",

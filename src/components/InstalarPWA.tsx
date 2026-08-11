@@ -71,7 +71,7 @@ export function InstalarPWA() {
         </p>
       ) : (
         <>
-          <p className="text-sm">Instalá gastos-voz como app en tu celular.</p>
+          <p className="text-sm">Instalá Gastos como app en tu celular.</p>
           <div className="flex gap-2 shrink-0">
             <button
               onClick={instalar}
