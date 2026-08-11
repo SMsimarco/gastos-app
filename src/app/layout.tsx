@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { RegistrarServiceWorker } from "@/components/RegistrarServiceWorker";
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         className="min-h-full flex flex-col bg-background text-foreground"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
+        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" id="google-identity-script" />
         <RegistrarServiceWorker />
         {children}
       </body>

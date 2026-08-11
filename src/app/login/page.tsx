@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { crearClienteBrowser } from "@/lib/supabase/client";
-import { IconGoogle } from "@/components/icons";
+import { BotonGoogle } from "@/components/BotonGoogle";
 
 export default function LoginPage() {
   return (
@@ -40,14 +40,6 @@ function LoginForm() {
     router.refresh();
   }
 
-  async function conGoogle() {
-    const supabase = crearClienteBrowser();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
-  }
-
   return (
     <main className="flex-1 flex items-center justify-center p-6">
       <form onSubmit={handleSubmit} className="w-full max-w-sm flex flex-col gap-4">
@@ -59,14 +51,7 @@ function LoginForm() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={conGoogle}
-          className="pressable card px-4 py-3 flex items-center justify-center gap-2.5 text-sm font-medium hover:border-accent transition-colors"
-        >
-          <IconGoogle size={18} />
-          Continuar con Google
-        </button>
+        <BotonGoogle onError={setError} />
 
         <div className="flex items-center gap-3 text-muted text-xs">
           <div className="flex-1 h-px bg-border-soft" />
