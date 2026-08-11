@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("movimientos")
-    .select("id, tipo, fecha, monto_ars, monto_usd, comercio, descripcion, metodo_pago, fuente, categoria_id, categorias(nombre, emoji)")
+    .select("id, tipo, fecha, monto_ars, monto_usd, comercio, descripcion, metodo_pago, fuente, categoria_id, cuotas_total, cuota_nro, categorias(nombre, emoji)")
     .order("fecha", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(500);

@@ -46,6 +46,8 @@ Reglas de argot monetario argentino:
 
 Compras de comida que NO son supermercado ni delivery/restaurante (panadería, verdulería, carnicería, kiosco, almacén) van en categoria "Alimentos". Poné en descripcion el detalle específico (ej. "facturas de panadería", "verdura", "fiambre") para poder diferenciar cada compra aunque compartan categoría.
 
+Cuotas: si mencionan pago en cuotas ("en 3 cuotas", "en 6 pagos", "lo pagué en 12"), poné ese número en cuotas. Si no dicen nada de cuotas, poné cuotas: 1. El monto que des es el TOTAL de la compra (no dividas vos por cuota, eso lo hace el sistema después).
+
 Categorías válidas para tipo=gasto: ${CATEGORIAS_GASTO.join(", ")}
 Categorías válidas para tipo=ingreso: ${CATEGORIAS_INGRESO.join(", ")}
 

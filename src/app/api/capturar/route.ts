@@ -62,8 +62,9 @@ export async function POST(request: NextRequest) {
     try {
       const guardado = await guardarMovimiento(supabaseServicio, item, fuente, user.id);
       resultados.push({ guardado: true, ...guardado });
+      const infoCuotas = guardado.cuotas_total > 1 ? ` (en ${guardado.cuotas_total} cuotas de $${guardado.monto_ars})` : "";
       await notificarTelegram(
-        `✅ Registrado desde la app\n${guardado.categoriaEmoji} ${guardado.categoriaNombre} — ${guardado.descripcion}\n$${guardado.monto_ars} · ${guardado.fecha}`,
+        `✅ Registrado desde la app\n${guardado.categoriaEmoji} ${guardado.categoriaNombre} — ${guardado.descripcion}\n$${guardado.monto_ars} · ${guardado.fecha}${infoCuotas}`,
         user.email ?? ""
       );
     } catch (error) {

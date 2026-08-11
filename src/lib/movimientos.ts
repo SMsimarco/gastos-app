@@ -41,6 +41,16 @@ async function obtenerUltimoTC(supabase: SupabaseClient): Promise<number | null>
   return data && data.length > 0 ? data[0].oficial_venta : null;
 }
 
+// Suma n meses a una fecha ISO (YYYY-MM-DD), recortando al ultimo dia valido
+// del mes destino (ej. 31 ene + 1 mes = 28/29 feb, no "3 de marzo").
+function sumarMeses(fechaISO: string, n: number): string {
+  const [anio, mes, dia] = fechaISO.split("-").map(Number);
+  const fecha = new Date(Date.UTC(anio, mes - 1 + n, 1));
+  const ultimoDiaDelMes = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth() + 1, 0)).getUTCDate();
+  fecha.setUTCDate(Math.min(dia, ultimoDiaDelMes));
+  return fecha.toISOString().slice(0, 10);
+}
+
 export async function guardarMovimiento(
   supabase: SupabaseClient,
   item: Movimiento,
@@ -50,35 +60,59 @@ export async function guardarMovimiento(
   const categoria = await resolverCategoria(supabase, item, usuarioId);
   const tcUsado = await obtenerUltimoTC(supabase);
 
-  const montoArs = item.moneda === "ARS" ? item.monto : tcUsado ? Number((item.monto * tcUsado).toFixed(2)) : item.monto;
-  const montoUsd = item.moneda === "ARS"
+  const cuotasTotal = Math.max(1, Math.floor(item.cuotas) || 1);
+  const montoArsTotal = item.moneda === "ARS" ? item.monto : tcUsado ? Number((item.monto * tcUsado).toFixed(2)) : item.monto;
+  const montoUsdTotal = item.moneda === "ARS"
     ? (tcUsado ? Number((item.monto / tcUsado).toFixed(2)) : null)
     : item.monto;
 
-  const { data, error } = await supabase
+  const montoArsCuota = Number((montoArsTotal / cuotasTotal).toFixed(2));
+  const montoUsdCuota = montoUsdTotal !== null ? Number((montoUsdTotal / cuotasTotal).toFixed(2)) : null;
+
+  const base = {
+    usuario_id: usuarioId,
+    tipo: item.tipo,
+    tc_usado: tcUsado,
+    moneda_origen: item.moneda,
+    categoria_id: categoria.id,
+    comercio: item.comercio || null,
+    descripcion: item.descripcion,
+    metodo_pago: item.metodo_pago || null,
+    fuente,
+    confianza: item.confianza,
+  };
+
+  const { data: padre, error } = await supabase
     .from("movimientos")
     .insert({
-      usuario_id: usuarioId,
-      tipo: item.tipo,
+      ...base,
       fecha: item.fecha,
-      monto_ars: montoArs,
-      monto_usd: montoUsd,
-      tc_usado: tcUsado,
-      moneda_origen: item.moneda,
-      categoria_id: categoria.id,
-      comercio: item.comercio || null,
-      descripcion: item.descripcion,
-      metodo_pago: item.metodo_pago || null,
-      cuotas_total: 1,
+      monto_ars: montoArsCuota,
+      monto_usd: montoUsdCuota,
+      cuotas_total: cuotasTotal,
       cuota_nro: 1,
-      fuente,
       transcripcion_raw: item.transcripcion_raw,
-      confianza: item.confianza,
     })
     .select()
     .single();
 
   if (error) throw new Error(`No pude insertar el movimiento: ${error.message}`);
 
-  return { ...data, categoriaEmoji: categoria.emoji, categoriaNombre: categoria.nombre };
+  if (cuotasTotal > 1) {
+    const hijos = Array.from({ length: cuotasTotal - 1 }, (_, i) => ({
+      ...base,
+      fecha: sumarMeses(item.fecha, i + 1),
+      monto_ars: montoArsCuota,
+      monto_usd: montoUsdCuota,
+      cuotas_total: cuotasTotal,
+      cuota_nro: i + 2,
+      movimiento_padre_id: padre.id,
+      transcripcion_raw: null,
+    }));
+
+    const { error: errorHijos } = await supabase.from("movimientos").insert(hijos);
+    if (errorHijos) throw new Error(`No pude insertar las cuotas restantes: ${errorHijos.message}`);
+  }
+
+  return { ...padre, categoriaEmoji: categoria.emoji, categoriaNombre: categoria.nombre };
 }

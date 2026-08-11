@@ -8,6 +8,8 @@ type MovimientoFila = {
   monto_ars: number;
   descripcion: string;
   fecha: string;
+  cuotas_total?: number;
+  cuota_nro?: number;
   categoriaEmoji?: string;
   categoriaNombre?: string;
 };
@@ -202,7 +204,10 @@ export function CapturaMovimientos({
               <p className="font-medium truncate">
                 {m.categoriaEmoji ?? "📦"} {m.categoriaNombre ?? ""} — {m.descripcion}
               </p>
-              <p className="text-muted text-sm">{m.fecha}</p>
+              <p className="text-muted text-sm">
+                {m.fecha}
+                {m.cuotas_total && m.cuotas_total > 1 ? ` · cuota ${m.cuota_nro}/${m.cuotas_total}` : ""}
+              </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <span

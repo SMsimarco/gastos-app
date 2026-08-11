@@ -15,6 +15,8 @@ type MovimientoFila = {
   metodo_pago: string | null;
   fuente: string;
   categoria_id: string | null;
+  cuotas_total: number;
+  cuota_nro: number;
   categorias: { nombre: string; emoji: string } | null;
 };
 
@@ -89,6 +91,37 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
   async function borrar(id: string) {
     setMovimientos((prev) => prev.filter((m) => m.id !== id));
     await fetch(`/api/movimientos/${id}`, { method: "DELETE" });
+  }
+
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editMonto, setEditMonto] = useState("");
+  const [editCategoriaId, setEditCategoriaId] = useState("");
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+
+  function empezarEdicion(m: MovimientoFila) {
+    setEditandoId(m.id);
+    setEditMonto(String(m.monto_ars));
+    setEditCategoriaId(m.categoria_id ?? "");
+  }
+
+  async function guardarEdicion(id: string) {
+    setGuardandoEdicion(true);
+    try {
+      const res = await fetch(`/api/movimientos/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monto_ars: Number(editMonto), categoria_id: editCategoriaId || null }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMovimientos((prev) =>
+          prev.map((m) => (m.id === id ? { ...m, ...data.movimiento } : m))
+        );
+        setEditandoId(null);
+      }
+    } finally {
+      setGuardandoEdicion(false);
+    }
   }
 
   function exportarCSV() {
@@ -192,38 +225,89 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
         ) : movimientos.length === 0 ? (
           <p className="text-muted text-sm">No hay movimientos con esos filtros.</p>
         ) : (
-          movimientos.map((m) => (
-            <div
-              key={m.id}
-              className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="font-medium truncate">
-                  {m.categorias?.emoji ?? "📦"} {m.categorias?.nombre ?? "Sin categoría"} — {m.descripcion}
-                </p>
-                <p className="text-muted text-sm">
-                  {m.fecha}
-                  {m.comercio ? ` · ${m.comercio}` : ""}
-                  {m.metodo_pago ? ` · ${m.metodo_pago}` : ""}
-                </p>
+          movimientos.map((m) =>
+            editandoId === m.id ? (
+              <div key={m.id} className="bg-surface border border-accent rounded-lg px-4 py-3 flex flex-col gap-2">
+                <p className="text-sm text-muted truncate">{m.descripcion}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={editMonto}
+                    onChange={(e) => setEditMonto(e.target.value)}
+                    className={inputCls}
+                  />
+                  <select
+                    value={editCategoriaId}
+                    onChange={(e) => setEditCategoriaId(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">Sin categoría</option>
+                    {categorias
+                      .filter((c) => c.tipo === m.tipo)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.emoji} {c.nombre}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => guardarEdicion(m.id)}
+                    disabled={guardandoEdicion}
+                    className="flex-1 bg-accent text-black font-medium rounded-lg px-3 py-2 text-sm disabled:opacity-50"
+                  >
+                    {guardandoEdicion ? "Guardando..." : "Guardar"}
+                  </button>
+                  <button
+                    onClick={() => setEditandoId(null)}
+                    className="bg-background border border-border rounded-lg px-3 py-2 text-sm text-muted"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span
-                  className="text-lg font-semibold tabular-nums"
-                  style={{ color: m.tipo === "gasto" ? "#e66767" : "#22c55e" }}
-                >
-                  {m.tipo === "gasto" ? "-" : "+"}${fmt(m.monto_ars)}
-                </span>
-                <button
-                  onClick={() => borrar(m.id)}
-                  className="text-muted hover:text-danger text-sm p-1"
-                  aria-label="Borrar"
-                >
-                  🗑
-                </button>
+            ) : (
+              <div
+                key={m.id}
+                className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium truncate">
+                    {m.categorias?.emoji ?? "📦"} {m.categorias?.nombre ?? "Sin categoría"} — {m.descripcion}
+                  </p>
+                  <p className="text-muted text-sm">
+                    {m.fecha}
+                    {m.comercio ? ` · ${m.comercio}` : ""}
+                    {m.metodo_pago ? ` · ${m.metodo_pago}` : ""}
+                    {m.cuotas_total > 1 ? ` · cuota ${m.cuota_nro}/${m.cuotas_total}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className="text-lg font-semibold tabular-nums"
+                    style={{ color: m.tipo === "gasto" ? "#e66767" : "#22c55e" }}
+                  >
+                    {m.tipo === "gasto" ? "-" : "+"}${fmt(m.monto_ars)}
+                  </span>
+                  <button
+                    onClick={() => empezarEdicion(m)}
+                    className="text-muted hover:text-foreground text-sm p-1"
+                    aria-label="Editar"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => borrar(m.id)}
+                    className="text-muted hover:text-danger text-sm p-1"
+                    aria-label="Borrar"
+                  >
+                    🗑
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            )
+          )
         )}
       </div>
     </div>

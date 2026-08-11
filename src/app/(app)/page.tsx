@@ -15,7 +15,7 @@ export default async function Home() {
   const [{ data: movimientos }, { data: kpis }] = await Promise.all([
     supabase
       .from("movimientos")
-      .select("id, tipo, monto_ars, descripcion, fecha, categorias(emoji, nombre)")
+      .select("id, tipo, monto_ars, descripcion, fecha, cuotas_total, cuota_nro, categorias(emoji, nombre)")
       .eq("fecha", hoyAR)
       .order("created_at", { ascending: false }),
     supabase.rpc("kpis_mes", { mes_inicio: inicioMes }).single(),
@@ -29,6 +29,8 @@ export default async function Home() {
       monto_ars: m.monto_ars,
       descripcion: m.descripcion,
       fecha: m.fecha,
+      cuotas_total: m.cuotas_total,
+      cuota_nro: m.cuota_nro,
       categoriaEmoji: categoria?.emoji,
       categoriaNombre: categoria?.nombre,
     };
