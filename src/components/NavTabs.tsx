@@ -6,7 +6,10 @@ import { crearClienteBrowser } from "@/lib/supabase/client";
 
 const TABS = [
   { href: "/", label: "Hoy", icon: "🎙️" },
+  { href: "/semana", label: "Semana", icon: "📅" },
   { href: "/mes", label: "Mes", icon: "📊" },
+  { href: "/anio", label: "Año", icon: "🗓️" },
+  { href: "/todos", label: "Todos", icon: "📋" },
 ];
 
 export function NavTabs() {
@@ -25,12 +28,12 @@ export function NavTabs() {
       className="flex items-center justify-between border-b border-border px-2 bg-background sticky top-0 z-10"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
-      <div className="flex gap-1">
+      <div className="flex gap-1 overflow-x-auto">
         {TABS.map((tab) => (
           <Link
             key={tab.href}
             href={tab.href}
-            className={`flex items-center gap-1.5 px-3 py-3 text-sm border-b-2 -mb-px transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-3 text-sm border-b-2 -mb-px transition-colors shrink-0 ${
               pathname === tab.href
                 ? "border-accent text-foreground font-medium"
                 : "border-transparent text-muted hover:text-foreground"

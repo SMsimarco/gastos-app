@@ -1,0 +1,231 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+type Categoria = { id: string; nombre: string; emoji: string; tipo: string };
+
+type MovimientoFila = {
+  id: string;
+  tipo: string;
+  fecha: string;
+  monto_ars: number;
+  monto_usd: number | null;
+  comercio: string | null;
+  descripcion: string;
+  metodo_pago: string | null;
+  fuente: string;
+  categoria_id: string | null;
+  categorias: { nombre: string; emoji: string } | null;
+};
+
+const METODOS_PAGO = ["efectivo", "debito", "credito", "transferencia", "mercadopago"];
+const fmt = (n: number) => Math.round(n).toLocaleString("es-AR");
+
+function aCSV(filas: MovimientoFila[]) {
+  const header = ["fecha", "tipo", "categoria", "descripcion", "comercio", "metodo_pago", "monto_ars", "monto_usd", "fuente"];
+  const lineas = filas.map((f) =>
+    [
+      f.fecha,
+      f.tipo,
+      f.categorias?.nombre ?? "",
+      `"${(f.descripcion ?? "").replace(/"/g, '""')}"`,
+      f.comercio ?? "",
+      f.metodo_pago ?? "",
+      f.monto_ars,
+      f.monto_usd ?? "",
+      f.fuente,
+    ].join(",")
+  );
+  return [header.join(","), ...lineas].join("\n");
+}
+
+export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
+  const [movimientos, setMovimientos] = useState<MovimientoFila[]>([]);
+  const [cargando, setCargando] = useState(true);
+
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [categoriaId, setCategoriaId] = useState("");
+  const [metodoPago, setMetodoPago] = useState("");
+  const [comercio, setComercio] = useState("");
+  const [montoMin, setMontoMin] = useState("");
+  const [montoMax, setMontoMax] = useState("");
+
+  const buscar = useCallback(async () => {
+    setCargando(true);
+    const params = new URLSearchParams();
+    if (desde) params.set("desde", desde);
+    if (hasta) params.set("hasta", hasta);
+    if (categoriaId) params.set("categoria_id", categoriaId);
+    if (metodoPago) params.set("metodo_pago", metodoPago);
+    if (comercio) params.set("comercio", comercio);
+    if (montoMin) params.set("monto_min", montoMin);
+    if (montoMax) params.set("monto_max", montoMax);
+
+    try {
+      const res = await fetch(`/api/movimientos?${params.toString()}`);
+      const data = await res.json();
+      setMovimientos(data.movimientos ?? []);
+    } finally {
+      setCargando(false);
+    }
+  }, [desde, hasta, categoriaId, metodoPago, comercio, montoMin, montoMax]);
+
+  useEffect(() => {
+    buscar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function limpiarFiltros() {
+    setDesde("");
+    setHasta("");
+    setCategoriaId("");
+    setMetodoPago("");
+    setComercio("");
+    setMontoMin("");
+    setMontoMax("");
+  }
+
+  async function borrar(id: string) {
+    setMovimientos((prev) => prev.filter((m) => m.id !== id));
+    await fetch(`/api/movimientos/${id}`, { method: "DELETE" });
+  }
+
+  function exportarCSV() {
+    const csv = aCSV(movimientos);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gastos-voz-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const inputCls =
+    "bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-accent transition-colors";
+
+  const total = movimientos
+    .filter((m) => m.tipo === "gasto")
+    .reduce((acc, m) => acc + m.monto_ars, 0);
+
+  return (
+    <div className="flex flex-col gap-4 w-full max-w-2xl mx-auto p-4 pb-10">
+      <h1 className="text-2xl font-semibold pt-2">Todos los movimientos</h1>
+
+      <div className="bg-surface border border-border rounded-lg p-4 flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-2">
+          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className={inputCls} />
+          <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className={inputCls} />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)} className={inputCls}>
+            <option value="">Todas las categorías</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.emoji} {c.nombre}
+              </option>
+            ))}
+          </select>
+          <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} className={inputCls}>
+            <option value="">Todos los métodos</option>
+            {METODOS_PAGO.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
+        <input
+          value={comercio}
+          onChange={(e) => setComercio(e.target.value)}
+          placeholder="Buscar comercio..."
+          className={inputCls}
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="number"
+            value={montoMin}
+            onChange={(e) => setMontoMin(e.target.value)}
+            placeholder="Monto mín."
+            className={inputCls}
+          />
+          <input
+            type="number"
+            value={montoMax}
+            onChange={(e) => setMontoMax(e.target.value)}
+            placeholder="Monto máx."
+            className={inputCls}
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={buscar}
+            className="flex-1 bg-accent text-black font-medium rounded-lg px-4 py-2 text-sm hover:brightness-110 transition-[filter]"
+          >
+            Buscar
+          </button>
+          <button
+            onClick={limpiarFiltros}
+            className="bg-background border border-border rounded-lg px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+          >
+            Limpiar
+          </button>
+          <button
+            onClick={exportarCSV}
+            disabled={movimientos.length === 0}
+            className="bg-background border border-border rounded-lg px-4 py-2 text-sm disabled:opacity-40 hover:border-accent transition-colors"
+          >
+            CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-sm text-muted px-1">
+        <span>{movimientos.length} movimientos</span>
+        <span className="tabular-nums">Total gastos: ${fmt(total)}</span>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {cargando ? (
+          <p className="text-muted text-sm">Cargando...</p>
+        ) : movimientos.length === 0 ? (
+          <p className="text-muted text-sm">No hay movimientos con esos filtros.</p>
+        ) : (
+          movimientos.map((m) => (
+            <div
+              key={m.id}
+              className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3"
+            >
+              <div className="min-w-0">
+                <p className="font-medium truncate">
+                  {m.categorias?.emoji ?? "📦"} {m.categorias?.nombre ?? "Sin categoría"} — {m.descripcion}
+                </p>
+                <p className="text-muted text-sm">
+                  {m.fecha}
+                  {m.comercio ? ` · ${m.comercio}` : ""}
+                  {m.metodo_pago ? ` · ${m.metodo_pago}` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <span
+                  className="text-lg font-semibold tabular-nums"
+                  style={{ color: m.tipo === "gasto" ? "#e66767" : "#22c55e" }}
+                >
+                  {m.tipo === "gasto" ? "-" : "+"}${fmt(m.monto_ars)}
+                </span>
+                <button
+                  onClick={() => borrar(m.id)}
+                  className="text-muted hover:text-danger text-sm p-1"
+                  aria-label="Borrar"
+                >
+                  🗑
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
