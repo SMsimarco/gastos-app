@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor, crearClienteServicio } from "@/lib/supabase/server";
-import { extraerMovimientos } from "@/lib/gemini";
+import { extraerMovimientos, clasificarYExtraerTexto, type Movimiento } from "@/lib/gemini";
 import { guardarMovimiento } from "@/lib/movimientos";
-import { notificarTelegram } from "@/lib/telegram";
+import { chequearPresupuestoExcedido } from "@/lib/presupuestos";
+import { responderConsulta } from "@/lib/consultas";
+import { enviarPush } from "@/lib/push";
 
 export async function POST(request: NextRequest) {
   const supabaseAuth = await crearClienteServidor();
@@ -36,13 +38,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Mandá audio, foto o texto" }, { status: 400 });
   }
 
-  let movimientos;
+  const supabaseServicio = crearClienteServicio();
+
+  let movimientos: Movimiento[];
   try {
-    movimientos = await extraerMovimientos({
-      base64Data,
-      mimeType,
-      textoMensaje: texto ?? undefined,
-    });
+    if (fuente === "texto" && texto) {
+      const resultado = await clasificarYExtraerTexto(texto);
+      if (resultado.intencion === "consulta") {
+        const respuesta = await responderConsulta(supabaseServicio, user.id, resultado.pregunta);
+        return NextResponse.json({ tipo: "consulta", respuesta });
+      }
+      movimientos = resultado.movimientos;
+    } else {
+      movimientos = await extraerMovimientos({ base64Data, mimeType, textoMensaje: texto ?? undefined });
+    }
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Error llamando a Gemini" },
@@ -50,7 +59,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabaseServicio = crearClienteServicio();
   const resultados = [];
 
   for (const item of movimientos) {
@@ -62,11 +70,32 @@ export async function POST(request: NextRequest) {
     try {
       const guardado = await guardarMovimiento(supabaseServicio, item, fuente, user.id);
       resultados.push({ guardado: true, ...guardado });
-      const infoCuotas = guardado.cuotas_total > 1 ? ` (en ${guardado.cuotas_total} cuotas de $${guardado.monto_ars})` : "";
-      await notificarTelegram(
-        `✅ Registrado desde la app\n${guardado.categoriaEmoji} ${guardado.categoriaNombre} — ${guardado.descripcion}\n$${guardado.monto_ars} · ${guardado.fecha}${infoCuotas}`,
-        user.email ?? ""
-      );
+
+      const infoCuotas =
+        guardado.cuotas_total > 1 ? ` (cuota 1/${guardado.cuotas_total} de $${guardado.monto_ars})` : "";
+      const infoDuplicado = guardado.posibleDuplicado ? " ⚠️ Parece un duplicado de otro gasto de hoy." : "";
+
+      await enviarPush(supabaseServicio, user.id, {
+        title: "Registrado",
+        body: `${guardado.categoriaEmoji} ${guardado.categoriaNombre} — ${guardado.descripcion}\n$${guardado.monto_ars} · ${guardado.fecha}${infoCuotas}${infoDuplicado}`,
+      });
+
+      if (guardado.tipo === "gasto" && guardado.categoria_id) {
+        const excedido = await chequearPresupuestoExcedido(
+          supabaseServicio,
+          user.id,
+          guardado.categoria_id,
+          guardado.categoriaNombre,
+          guardado.fecha,
+          guardado.monto_ars
+        );
+        if (excedido) {
+          await enviarPush(supabaseServicio, user.id, {
+            title: "Te pasaste del presupuesto",
+            body: `${excedido.categoriaNombre}: $${Math.round(excedido.gastado).toLocaleString("es-AR")} de $${Math.round(excedido.presupuesto).toLocaleString("es-AR")} este mes.`,
+          });
+        }
+      }
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Error guardando el movimiento" },
@@ -75,5 +104,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ resultados });
+  return NextResponse.json({ tipo: "registro", resultados });
 }

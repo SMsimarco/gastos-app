@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Movimiento } from "./gemini";
+import { detectarDuplicado } from "./duplicados";
 
 type CategoriaInfo = { id: string; emoji: string; nombre: string };
 
@@ -62,6 +63,15 @@ export async function guardarMovimiento(
 
   const cuotasTotal = Math.max(1, Math.floor(item.cuotas) || 1);
   const montoArsTotal = item.moneda === "ARS" ? item.monto : tcUsado ? Number((item.monto * tcUsado).toFixed(2)) : item.monto;
+  const posibleDuplicado = await detectarDuplicado(
+    supabase,
+    usuarioId,
+    item.fecha,
+    item.tipo,
+    montoArsTotal,
+    item.comercio,
+    item.descripcion
+  );
   const montoUsdTotal = item.moneda === "ARS"
     ? (tcUsado ? Number((item.monto / tcUsado).toFixed(2)) : null)
     : item.monto;
@@ -114,5 +124,5 @@ export async function guardarMovimiento(
     if (errorHijos) throw new Error(`No pude insertar las cuotas restantes: ${errorHijos.message}`);
   }
 
-  return { ...padre, categoriaEmoji: categoria.emoji, categoriaNombre: categoria.nombre };
+  return { ...padre, categoriaEmoji: categoria.emoji, categoriaNombre: categoria.nombre, posibleDuplicado };
 }

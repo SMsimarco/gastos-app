@@ -27,17 +27,20 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const esRutaPublica =
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/signup");
+  const esApi = request.nextUrl.pathname.startsWith("/api/");
+  const esAuthPage =
+    request.nextUrl.pathname.startsWith("/login") || request.nextUrl.pathname.startsWith("/signup");
 
-  if (!user && !esRutaPublica) {
+  // Las API routes validan su propia auth (sesion de usuario o CRON_SECRET) — el proxy no interviene.
+  if (esApi) return response;
+
+  if (!user && !esAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && esRutaPublica) {
+  if (user && esAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

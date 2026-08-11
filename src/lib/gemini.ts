@@ -29,6 +29,34 @@ const CATEGORIAS_GASTO = [
 ];
 const CATEGORIAS_INGRESO = ["Clientes", "Sueldo", "Ventas", "Otros"];
 
+async function generarJSON(parts: Array<Record<string, unknown>>, schema: Record<string, unknown>) {
+  const res = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": process.env.GEMINI_API_KEY!,
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Gemini falló: ${res.status} ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  const textoRespuesta = data.candidates[0].content.parts[0].text;
+  return JSON.parse(textoRespuesta);
+}
+
 function construirPrompt(fechaHoyAR: string) {
   return `Sos un extractor de movimientos financieros a partir de un mensaje (audio, foto de ticket, o texto) en español rioplatense (Argentina).
 Fecha de hoy: ${fechaHoyAR} (timezone America/Argentina/Buenos_Aires). Resolvé fechas relativas ("ayer", "el viernes pasado") contra esta fecha, nunca uses UTC.
@@ -55,39 +83,36 @@ Si NO podés determinar el monto con confianza razonable, poné confianza "baja"
 Guardá siempre en transcripcion_raw una transcripción fiel de lo que se dijo o del texto/ticket recibido.`;
 }
 
-const RESPONSE_SCHEMA = {
-  type: "ARRAY",
-  items: {
-    type: "OBJECT",
-    properties: {
-      tipo: { type: "STRING", enum: ["gasto", "ingreso"] },
-      monto: { type: "NUMBER" },
-      moneda: { type: "STRING", enum: ["ARS", "USD"] },
-      descripcion: { type: "STRING" },
-      comercio: { type: "STRING", nullable: true },
-      categoria: { type: "STRING" },
-      metodo_pago: {
-        type: "STRING",
-        enum: ["efectivo", "debito", "credito", "transferencia", "mercadopago"],
-        nullable: true,
-      },
-      cuotas: { type: "INTEGER" },
-      fecha: { type: "STRING" },
-      confianza: { type: "STRING", enum: ["alta", "media", "baja"] },
-      transcripcion_raw: { type: "STRING" },
+const MOVIMIENTO_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    tipo: { type: "STRING", enum: ["gasto", "ingreso"] },
+    monto: { type: "NUMBER" },
+    moneda: { type: "STRING", enum: ["ARS", "USD"] },
+    descripcion: { type: "STRING" },
+    comercio: { type: "STRING", nullable: true },
+    categoria: { type: "STRING" },
+    metodo_pago: {
+      type: "STRING",
+      enum: ["efectivo", "debito", "credito", "transferencia", "mercadopago"],
+      nullable: true,
     },
-    required: [
-      "tipo",
-      "monto",
-      "moneda",
-      "descripcion",
-      "categoria",
-      "cuotas",
-      "fecha",
-      "confianza",
-      "transcripcion_raw",
-    ],
+    cuotas: { type: "INTEGER" },
+    fecha: { type: "STRING" },
+    confianza: { type: "STRING", enum: ["alta", "media", "baja"] },
+    transcripcion_raw: { type: "STRING" },
   },
+  required: [
+    "tipo",
+    "monto",
+    "moneda",
+    "descripcion",
+    "categoria",
+    "cuotas",
+    "fecha",
+    "confianza",
+    "transcripcion_raw",
+  ],
 };
 
 export async function extraerMovimientos(input: {
@@ -106,29 +131,81 @@ export async function extraerMovimientos(input: {
     parts.push({ text: `Mensaje del usuario: "${input.textoMensaje}"` });
   }
 
-  const res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": process.env.GEMINI_API_KEY!,
-      },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
-        },
-      }),
-    }
+  return generarJSON(parts, { type: "ARRAY", items: MOVIMIENTO_SCHEMA });
+}
+
+export type ResultadoTexto =
+  | { intencion: "registro"; movimientos: Movimiento[] }
+  | { intencion: "consulta"; pregunta: string };
+
+export async function clasificarYExtraerTexto(textoMensaje: string): Promise<ResultadoTexto> {
+  const fechaHoyAR = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  });
+
+  const prompt = `${construirPrompt(fechaHoyAR)}
+
+Antes que nada, decidí la intención del mensaje:
+- "registro": el usuario está contando un gasto o ingreso nuevo para guardar.
+- "consulta": el usuario está PREGUNTANDO sobre sus gastos pasados (ej. "¿cuánto gasté en comida?", "¿en qué se me fue la plata este mes?", "cuánto gasté ayer").
+
+Si es "consulta", dejá "movimientos" como array vacío y poné la pregunta tal cual en "pregunta".
+Si es "registro", llená "movimientos" normalmente y "pregunta" puede quedar vacía.`;
+
+  const schema = {
+    type: "OBJECT",
+    properties: {
+      intencion: { type: "STRING", enum: ["registro", "consulta"] },
+      movimientos: { type: "ARRAY", items: MOVIMIENTO_SCHEMA },
+      pregunta: { type: "STRING" },
+    },
+    required: ["intencion", "movimientos", "pregunta"],
+  };
+
+  const data = await generarJSON(
+    [{ text: prompt }, { text: `Mensaje del usuario: "${textoMensaje}"` }],
+    schema
   );
 
-  if (!res.ok) {
-    throw new Error(`Gemini falló: ${res.status} ${await res.text()}`);
+  if (data.intencion === "consulta") {
+    return { intencion: "consulta", pregunta: data.pregunta || textoMensaje };
   }
+  return { intencion: "registro", movimientos: data.movimientos ?? [] };
+}
 
-  const data = await res.json();
-  const textoRespuesta = data.candidates[0].content.parts[0].text;
-  return JSON.parse(textoRespuesta);
+export type FiltrosConsulta = {
+  desde: string;
+  hasta: string;
+  categoriaNombre: string | null;
+  tipo: "gasto" | "ingreso";
+};
+
+export async function interpretarPregunta(pregunta: string): Promise<FiltrosConsulta> {
+  const fechaHoyAR = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  });
+
+  const prompt = `Traducí esta pregunta sobre finanzas personales a filtros de fecha/categoría.
+Fecha de hoy: ${fechaHoyAR} (timezone America/Argentina/Buenos_Aires).
+"este mes" = desde el día 1 del mes actual hasta hoy.
+"la semana pasada" = los 7 días anteriores a hoy.
+"ayer" = el día calendario anterior a hoy (desde y hasta iguales).
+Si no menciona ninguna categoría específica, categoriaNombre debe ser null.
+Categorías válidas (usar el nombre EXACTO si aplica alguna): ${CATEGORIAS_GASTO.join(", ")}, ${CATEGORIAS_INGRESO.join(", ")}.
+Si no dice explícitamente "ingreso"/"cobré"/"me pagaron", asumí tipo "gasto".
+
+Pregunta: "${pregunta}"`;
+
+  const schema = {
+    type: "OBJECT",
+    properties: {
+      desde: { type: "STRING" },
+      hasta: { type: "STRING" },
+      categoriaNombre: { type: "STRING", nullable: true },
+      tipo: { type: "STRING", enum: ["gasto", "ingreso"] },
+    },
+    required: ["desde", "hasta", "tipo"],
+  };
+
+  return generarJSON([{ text: prompt }], schema);
 }

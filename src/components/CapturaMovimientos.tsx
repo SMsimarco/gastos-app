@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconMic, IconStop, IconSend, IconCamera, IconTrash } from "@/components/icons";
+import { encolarCaptura, obtenerCola, borrarDeCola, itemAFormData } from "@/lib/colaOffline";
 
 type MovimientoFila = {
   id: string;
@@ -31,6 +32,7 @@ export function CapturaMovimientos({
   const [procesando, setProcesando] = useState(false);
   const [texto, setTexto] = useState("");
   const [mensaje, setMensaje] = useState<{ texto: string; tipo: "ok" | "warn" } | null>(null);
+  const [pendientesOffline, setPendientesOffline] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -39,7 +41,87 @@ export function CapturaMovimientos({
     .filter((m) => m.tipo === "gasto")
     .reduce((acc, m) => acc + m.monto_ars, 0);
 
-  async function enviarCaptura(formData: FormData) {
+  function procesarRespuesta(data: {
+    tipo?: string;
+    respuesta?: string;
+    resultados?: Array<Record<string, unknown>>;
+  }) {
+    if (data.tipo === "consulta") {
+      setMensaje({ texto: data.respuesta ?? "", tipo: "ok" });
+      return;
+    }
+
+    const nuevos: MovimientoFila[] = [];
+    let huboBaja = false;
+    let huboDuplicado = false;
+    for (const r of data.resultados ?? []) {
+      if (r.confianza === "baja" && !r.guardado) {
+        huboBaja = true;
+      } else {
+        nuevos.push(r as unknown as MovimientoFila);
+        if (r.posibleDuplicado) huboDuplicado = true;
+      }
+    }
+
+    if (nuevos.length > 0) {
+      setMovimientos((prev) => [...nuevos, ...prev]);
+    }
+    if (huboBaja) {
+      setMensaje({
+        texto: "🤔 No entendí bien el monto, no se registró. Probá de nuevo siendo más específico.",
+        tipo: "warn",
+      });
+    } else if (huboDuplicado) {
+      setMensaje({ texto: "⚠️ Registrado, pero parece un duplicado de otro gasto de hoy.", tipo: "warn" });
+    } else if (nuevos.length > 0) {
+      setMensaje({ texto: `Registrado${nuevos.length > 1 ? ` (${nuevos.length})` : ""}`, tipo: "ok" });
+    } else {
+      setMensaje({ texto: "No encontré ningún movimiento en eso.", tipo: "warn" });
+    }
+  }
+
+  async function procesarColaPendiente() {
+    let cola;
+    try {
+      cola = await obtenerCola();
+    } catch {
+      return;
+    }
+    if (cola.length === 0) {
+      setPendientesOffline(0);
+      return;
+    }
+
+    for (const item of cola) {
+      try {
+        const res = await fetch("/api/capturar", { method: "POST", body: itemAFormData(item) });
+        if (res.ok) {
+          const data = await res.json();
+          procesarRespuesta(data);
+          if (item.id !== undefined) await borrarDeCola(item.id);
+        } else {
+          break; // error del servidor, no seguir intentando ahora
+        }
+      } catch {
+        break; // seguimos sin conexión, reintentar después
+      }
+    }
+
+    const restante = await obtenerCola();
+    setPendientesOffline(restante.length);
+  }
+
+  useEffect(() => {
+    procesarColaPendiente();
+    window.addEventListener("online", procesarColaPendiente);
+    return () => window.removeEventListener("online", procesarColaPendiente);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function enviarCaptura(
+    formData: FormData,
+    itemOffline: { tipo: "audio" | "texto" | "foto"; texto?: string; blob?: Blob; nombreArchivo?: string }
+  ) {
     setProcesando(true);
     setMensaje(null);
     try {
@@ -51,31 +133,15 @@ export function CapturaMovimientos({
         return;
       }
 
-      const nuevos: MovimientoFila[] = [];
-      let huboBaja = false;
-      for (const r of data.resultados) {
-        if (r.confianza === "baja" && !r.guardado) {
-          huboBaja = true;
-        } else {
-          nuevos.push(r);
-        }
-      }
-
-      if (nuevos.length > 0) {
-        setMovimientos((prev) => [...nuevos, ...prev]);
-      }
-      if (huboBaja) {
-        setMensaje({
-          texto: "🤔 No entendí bien el monto, no se registró. Probá de nuevo siendo más específico.",
-          tipo: "warn",
-        });
-      } else if (nuevos.length > 0) {
-        setMensaje({ texto: `Registrado${nuevos.length > 1 ? ` (${nuevos.length})` : ""}`, tipo: "ok" });
-      } else {
-        setMensaje({ texto: "No encontré ningún movimiento en eso.", tipo: "warn" });
-      }
+      procesarRespuesta(data);
     } catch {
-      setMensaje({ texto: "⚠️ Error de conexión", tipo: "warn" });
+      await encolarCaptura(itemOffline);
+      const cola = await obtenerCola();
+      setPendientesOffline(cola.length);
+      setMensaje({
+        texto: "📴 Sin conexión. Lo guardé y lo subo solo cuando vuelva la señal.",
+        tipo: "warn",
+      });
     } finally {
       setProcesando(false);
     }
@@ -92,7 +158,7 @@ export function CapturaMovimientos({
       const blob = new Blob(chunksRef.current, { type: "audio/webm" });
       const formData = new FormData();
       formData.append("audio", blob, "audio.webm");
-      await enviarCaptura(formData);
+      await enviarCaptura(formData, { tipo: "audio", blob, nombreArchivo: "audio.webm" });
     };
 
     mediaRecorder.start();
@@ -110,7 +176,7 @@ export function CapturaMovimientos({
     if (!file) return;
     const formData = new FormData();
     formData.append("foto", file);
-    await enviarCaptura(formData);
+    await enviarCaptura(formData, { tipo: "foto", blob: file, nombreArchivo: file.name });
     e.target.value = "";
   }
 
@@ -119,8 +185,9 @@ export function CapturaMovimientos({
     if (!texto.trim()) return;
     const formData = new FormData();
     formData.append("texto", texto);
+    const textoEnviado = texto;
     setTexto("");
-    await enviarCaptura(formData);
+    await enviarCaptura(formData, { tipo: "texto", texto: textoEnviado });
   }
 
   async function borrarMovimiento(id: string) {
@@ -142,6 +209,11 @@ export function CapturaMovimientos({
           <span className="text-sm text-muted">
             {diferenciaPromedio > 0 ? "↑" : diferenciaPromedio < 0 ? "↓" : "="}{" "}
             {Math.abs(diferenciaPromedio)}% vs. promedio diario del mes (${fmt(promedioDiario!)})
+          </span>
+        )}
+        {pendientesOffline > 0 && (
+          <span className="text-xs text-muted">
+            📴 {pendientesOffline} capturas esperando conexión para subir
           </span>
         )}
       </div>
@@ -176,7 +248,7 @@ export function CapturaMovimientos({
         <input
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder="o escribí el gasto..."
+          placeholder="o escribí el gasto, o preguntá algo..."
           className="flex-1 bg-surface border border-border-soft rounded-xl px-4 py-3 text-base outline-none focus:border-accent transition-colors"
         />
         <button
@@ -194,7 +266,9 @@ export function CapturaMovimientos({
       </form>
 
       {mensaje && (
-        <p className={`text-sm text-center ${mensaje.tipo === "ok" ? "text-accent" : "text-danger"}`}>
+        <p
+          className={`text-sm text-center whitespace-pre-line ${mensaje.tipo === "ok" ? "text-accent" : "text-danger"}`}
+        >
           {mensaje.texto}
         </p>
       )}
