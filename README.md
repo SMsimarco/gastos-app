@@ -1,53 +1,100 @@
 # gastos-voz
 
-Sistema personal de registro de gastos e ingresos. Todo vive en una sola PWA: capturás por voz/texto/foto y ves los gráficos en el mismo lugar. Un solo usuario, sin SaaS.
+Registro de gastos e ingresos por voz, texto o foto. Le hablás, le escribís o le sacás una foto al ticket, y la app entiende, categoriza y guarda el movimiento solo — sin formularios.
 
-Arquitectura: PWA (Next.js, Vercel) → API routes propias → Gemini Flash (extracción estructurada) → Supabase. Notificaciones salientes por Telegram (solo avisos, no captura).
+**App en producción:** *(agregar URL de Vercel acá una vez desplegada)*
 
-Ver `NOTES.md` para el detalle de verificación de la API de Gemini (modelo, endpoint, structured output).
+---
 
-> **Nota:** el proyecto arrancó con captura por n8n + Telegram (carpeta `n8n/`, ver commits viejos). Se retiró n8n del flujo de captura por la fricción de editar workflows a mano — queda como referencia, no se sigue desarrollando. `WF04` (recurrentes) y `WF05` (tipo de cambio) todavía están pendientes de portar a cron jobs de Vercel.
+## Qué hace
 
-## 1. Supabase
+- **Captura sin fricción** — grabás un audio ("gasté 3000 pesos en el kiosco"), escribís, o sacás una foto de un ticket. Un modelo de lenguaje (Gemini) interpreta el mensaje y extrae monto, categoría, comercio, método de pago y fecha, incluso con modismos rioplatenses ("20 lucas", "2 palos", "un verde").
+- **Categorización automática** — matchea contra reglas propias del usuario (ej. "McDonald's" → siempre Delivery/Restaurantes) antes de usar el criterio del modelo.
+- **Cuotas** — si mencionás "en 6 cuotas", divide el monto y programa cada cuota en el mes que corresponde automáticamente.
+- **Confianza baja = no inventa** — si no puede determinar el monto con seguridad, pide aclaración en vez de adivinar.
+- **Dashboards** — vistas de Hoy, Semana, Mes y Año con KPIs, gasto acumulado vs. período anterior, distribución por categoría, top comercios y un heatmap de actividad anual estilo GitHub.
+- **Tabla completa** — todos los movimientos, filtrables por fecha/categoría/método de pago/comercio/monto, con edición inline, borrado y exportación a CSV.
+- **Multi-usuario** — cada cuenta ve únicamente sus propios datos (aislamiento a nivel de base de datos, no solo de interfaz).
+- **PWA instalable** — funciona como app nativa en el celular, con soporte offline básico para la interfaz.
+- **Notificaciones por Telegram** — confirmación de cada movimiento registrado, sin depender de tener la app abierta.
 
-### Migraciones
+## Stack
 
-Corré en orden desde el SQL Editor de Supabase (o `supabase db push` si tenés la CLI linkeada):
+| Capa | Tecnología |
+|---|---|
+| Frontend / Backend | [Next.js](https://nextjs.org) (App Router, TypeScript) |
+| Base de datos | [Supabase](https://supabase.com) (Postgres + Auth + Row Level Security) |
+| IA | [Gemini Flash](https://ai.google.dev) — extracción estructurada desde audio, imagen y texto |
+| Gráficos | [Recharts](https://recharts.org), paleta validada para daltonismo |
+| Notificaciones | Telegram Bot API |
+| Hosting | [Vercel](https://vercel.com) |
+
+## Arquitectura
+
+```
+Usuario (audio / texto / foto)
+        │
+        ▼
+   PWA (Next.js) ──────────► API routes propias
+        │                          │
+        │                          ▼
+        │                    Gemini Flash (extracción estructurada)
+        │                          │
+        │                          ▼
+        │                    Supabase (Postgres + RLS por usuario)
+        │                          │
+        └──────────────────────────┴──► Dashboards (Hoy / Semana / Mes / Año / Todos)
+                                    │
+                                    ▼
+                              Telegram (confirmación)
+```
+
+Toda la lógica de negocio vive en API routes de Next.js — no hay orquestador externo. Las claves sensibles (service role de Supabase, API key de Gemini) nunca se exponen al navegador.
+
+---
+
+## Puesta en marcha
+
+### 1. Supabase
+
+Corré las migraciones en orden desde el SQL Editor (o `supabase db push` con la CLI):
 
 ```
 supabase/migrations/0001_init.sql
 supabase/migrations/0002_seeds.sql
 supabase/migrations/0003_agregaciones.sql
 supabase/migrations/0004_categoria_alimentos.sql
+supabase/migrations/0005_multi_tenant.sql
+supabase/migrations/0006_agregaciones_anuales.sql
 ```
 
 Verificá: `select count(*) from categorias;` → 17.
 
-### Usuario de login
+La autenticación es self-service: cualquier usuario puede crear su cuenta desde `/signup` (o creála vos a mano en Authentication → Users).
 
-La app tiene un solo usuario. Creálo en Supabase → Authentication → Users → **Add user**, con email + contraseña, marcado como confirmado (no hace falta que mande mail de verificación).
+Claves necesarias (Supabase → Settings → API):
 
-### Claves que necesitás
+| Variable | De dónde sale |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon / public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role key (marcada "secret") |
 
-Supabase → Settings → API:
-- **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
-- **anon / public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- **service_role key** (dice "secret" al lado) → `SUPABASE_SERVICE_ROLE_KEY`
-
-## 2. Gemini
+### 2. Gemini
 
 `GEMINI_API_KEY` desde [aistudio.google.com](https://aistudio.google.com) → Get API key.
 
-## 3. Telegram (solo notificaciones)
+### 3. Telegram (opcional — solo notificaciones salientes)
 
-1. Bot ya creado con BotFather (`@gastamos_bot` si es el mismo de antes) → `TELEGRAM_BOT_TOKEN`.
-2. Tu `chat_id` (sacalo con `https://api.telegram.org/bot<TOKEN>/getUpdates` después de mandarle un mensaje al bot) → `MY_TELEGRAM_CHAT_ID`.
+1. Creá un bot con [@BotFather](https://t.me/BotFather) → `TELEGRAM_BOT_TOKEN`.
+2. Tu `chat_id` (mandale un mensaje al bot y consultá `https://api.telegram.org/bot<TOKEN>/getUpdates`) → `MY_TELEGRAM_CHAT_ID`.
+3. `ADMIN_EMAIL` — el email de la cuenta que debe recibir las notificaciones (por ahora las notificaciones son solo para esa cuenta; no están vinculadas por usuario todavía).
 
-Esto es opcional — si no lo configurás, la app funciona igual, simplemente no manda avisos.
+Sin esto configurado, la app funciona igual — simplemente no manda avisos.
 
-## 4. Variables de entorno
+### 4. Variables de entorno
 
-Copiá `.env.example` a `.env.local` y completá:
+Copiá `.env.example` a `.env.local`:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=
@@ -56,43 +103,38 @@ SUPABASE_SERVICE_ROLE_KEY=
 GEMINI_API_KEY=
 TELEGRAM_BOT_TOKEN=
 MY_TELEGRAM_CHAT_ID=
+ADMIN_EMAIL=
 ```
 
-## 5. Correr local
+### 5. Correr local
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abrí `http://localhost:3000`, te redirige a `/login`. Entrá con el usuario que creaste en Supabase.
-
-## 6. Deploy en Vercel
+### 6. Deploy en Vercel
 
 ```bash
 vercel link
-vercel env pull   # o cargá las mismas env vars de arriba en el dashboard de Vercel
+vercel env add   # cargar cada variable de arriba
 vercel --prod
 ```
 
-## 7. Probar con datos reales (antes de dar la captura por buena)
+---
 
-- Grabá un audio corto: "gasté 500 pesos en el kiosco" → tiene que aparecer en la lista de "Hoy" al toque.
-- Probá un texto ambiguo: "gasté algo de plata" → tiene que avisar que no entendió el monto, sin registrar nada.
-- Sacale foto a un ticket cualquiera y mandala.
-- Borrá un movimiento con el 🗑 de la lista y confirmá que desaparece de Supabase también.
+## Decisiones de diseño
 
-## Notas de arquitectura
+- **Sin orquestador externo.** El proyecto arrancó sobre n8n + Telegram como capa de captura (ver `n8n/` y el historial de commits); se migró todo a código de aplicación por la fricción de mantener workflows visuales a mano. `n8n/` queda como referencia histórica, no se sigue desarrollando.
+- **Reglas de comercio antes que IA.** Si un comercio ya tiene una regla propia (`reglas_comercio`), esa categoría gana sobre lo que sugiere el modelo — determinismo por sobre inferencia cuando el usuario ya dio la respuesta correcta una vez.
+- **service_role nunca en el cliente.** Cada API route valida la sesión con la anon key primero; recién después usa la service role (que bypassea RLS) para escribir.
+- **Tema oscuro fijo, mobile-first.** Sin gradientes ni sombras decorativas — números grandes, tipografía clara.
 
-- **Auth:** Supabase Auth con `@supabase/ssr`, sesión en cookies, `proxy.ts` (ex-`middleware.ts`, renombrado en Next 16) protege todas las rutas menos `/login`.
-- **service_role solo en el servidor:** las API routes verifican la sesión del usuario primero (`crearClienteServidor`), y recién después usan `crearClienteServicio` (service_role, bypassea RLS) para escribir. Nunca se expone la service_role key al browser.
-- **Categorización:** mismo criterio que tenía n8n — primero busca en `reglas_comercio` (patrón de texto → categoría fija), si no matchea usa la categoría que sugirió Gemini.
-- **Tema oscuro fijo** (no sigue el tema del sistema), mobile-first, sin gradientes ni sombras exageradas — como pediste en la spec original.
+## Roadmap
 
-## Pendiente
-
-- Vistas Semana / Mes / Año / Todos de la PWA (por ahora solo está "Hoy").
-- Cuotas (insert padre + N-1 hijos).
-- WF04/WF05 (recurrentes y tipo de cambio) portados a Vercel Cron.
-- Consultas en lenguaje natural + digest semanal/mensual.
-- Iconos reales del manifest (`/icon-192.png`, `/icon-512.png` son referencias sin archivo todavía).
+- [ ] Presupuestos con alertas cuando se excede una categoría
+- [ ] Detección de gastos duplicados
+- [ ] Recurrentes y tipo de cambio automatizados (cron)
+- [ ] Vinculación de Telegram por usuario (no solo la cuenta admin)
+- [ ] Login con Google
+- [ ] Consultas en lenguaje natural ("¿cuánto gasté en comida este mes?")
