@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { IconEdit, IconTrash } from "@/components/icons";
 
 type Categoria = { id: string; nombre: string; emoji: string; tipo: string };
 
@@ -136,7 +137,7 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
   }
 
   const inputCls =
-    "bg-surface border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-accent transition-colors";
+    "card px-3 py-2 text-sm outline-none focus:border-accent transition-colors";
 
   const total = movimientos
     .filter((m) => m.tipo === "gasto")
@@ -146,7 +147,7 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
     <div className="flex flex-col gap-4 w-full max-w-2xl mx-auto p-4 pb-10">
       <h1 className="text-2xl font-semibold pt-2">Todos los movimientos</h1>
 
-      <div className="bg-surface border border-border rounded-lg p-4 flex flex-col gap-3">
+      <div className="card p-4 flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-2">
           <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className={inputCls} />
           <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className={inputCls} />
@@ -194,20 +195,20 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
         <div className="flex gap-2">
           <button
             onClick={buscar}
-            className="flex-1 bg-accent text-black font-medium rounded-lg px-4 py-2 text-sm hover:brightness-110 transition-[filter]"
+            className="flex-1 bg-accent text-black font-medium pressable rounded-xl px-4 py-2.5 text-sm hover:brightness-110 transition-[filter]"
           >
             Buscar
           </button>
           <button
             onClick={limpiarFiltros}
-            className="bg-background border border-border rounded-lg px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+            className="pressable bg-surface-2 border border-border-soft rounded-xl px-4 py-2.5 text-sm text-muted hover:text-foreground transition-colors"
           >
             Limpiar
           </button>
           <button
             onClick={exportarCSV}
             disabled={movimientos.length === 0}
-            className="bg-background border border-border rounded-lg px-4 py-2 text-sm disabled:opacity-40 hover:border-accent transition-colors"
+            className="pressable bg-surface-2 border border-border-soft rounded-xl px-4 py-2.5 text-sm disabled:opacity-40 hover:border-accent transition-colors"
           >
             CSV
           </button>
@@ -227,7 +228,7 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
         ) : (
           movimientos.map((m) =>
             editandoId === m.id ? (
-              <div key={m.id} className="bg-surface border border-accent rounded-lg px-4 py-3 flex flex-col gap-2">
+              <div key={m.id} className="card border-accent px-4 py-3 flex flex-col gap-2">
                 <p className="text-sm text-muted truncate">{m.descripcion}</p>
                 <div className="grid grid-cols-2 gap-2">
                   <input
@@ -255,13 +256,13 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
                   <button
                     onClick={() => guardarEdicion(m.id)}
                     disabled={guardandoEdicion}
-                    className="flex-1 bg-accent text-black font-medium rounded-lg px-3 py-2 text-sm disabled:opacity-50"
+                    className="flex-1 bg-accent text-black font-medium pressable rounded-xl px-3 py-2 text-sm disabled:opacity-50"
                   >
                     {guardandoEdicion ? "Guardando..." : "Guardar"}
                   </button>
                   <button
                     onClick={() => setEditandoId(null)}
-                    className="bg-background border border-border rounded-lg px-3 py-2 text-sm text-muted"
+                    className="pressable bg-surface-2 border border-border-soft rounded-xl px-3 py-2 text-sm text-muted"
                   >
                     Cancelar
                   </button>
@@ -270,7 +271,7 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
             ) : (
               <div
                 key={m.id}
-                className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3"
+                className="flex items-center justify-between card px-4 py-3"
               >
                 <div className="min-w-0">
                   <p className="font-medium truncate">
@@ -286,23 +287,23 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
                 <div className="flex items-center gap-2 shrink-0">
                   <span
                     className="text-lg font-semibold tabular-nums"
-                    style={{ color: m.tipo === "gasto" ? "#e66767" : "#22c55e" }}
+                    style={{ color: m.tipo === "gasto" ? "#f87171" : "#34d399" }}
                   >
                     {m.tipo === "gasto" ? "-" : "+"}${fmt(m.monto_ars)}
                   </span>
                   <button
                     onClick={() => empezarEdicion(m)}
-                    className="text-muted hover:text-foreground text-sm p-1"
+                    className="text-muted hover:text-foreground p-1 transition-colors"
                     aria-label="Editar"
                   >
-                    ✏️
+                    <IconEdit size={16} />
                   </button>
                   <button
                     onClick={() => borrar(m.id)}
-                    className="text-muted hover:text-danger text-sm p-1"
+                    className="text-muted hover:text-danger p-1 transition-colors"
                     aria-label="Borrar"
                   >
-                    🗑
+                    <IconTrash size={16} />
                   </button>
                 </div>
               </div>

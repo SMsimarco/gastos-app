@@ -1,28 +1,55 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0a;
-  --surface: #171717;
-  --border: #262626;
-  --foreground: #ededed;
-  --muted: #8a8a8a;
-  --accent: #22c55e;
-  --danger: #ef4444;
+  --background: #08090a;
+  --surface: #131415;
+  --surface-2: #1a1c1e;
+  --border: #232527;
+  --border-soft: #1d1f21;
+  --foreground: #f3f4f5;
+  --muted: #8b8f94;
+  --accent: #34d399;
+  --accent-soft: #34d39926;
+  --danger: #f87171;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-border: var(--border);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(ellipse 900px 500px at 50% -10%, #1a2e2380, transparent),
+    var(--background);
   color: var(--foreground);
+  min-height: 100vh;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+}
+
+.pressable {
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+.pressable:active {
+  transform: scale(0.97);
 }

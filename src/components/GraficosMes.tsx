@@ -43,7 +43,7 @@ const fmt = (n: number) => Math.round(n).toLocaleString("es-AR");
 
 function StatTile({ label, valor, destacado }: { label: string; valor: string; destacado?: boolean }) {
   return (
-    <div className="bg-surface border border-border rounded-lg px-4 py-3 flex flex-col gap-1">
+    <div className="card px-4 py-3 flex flex-col gap-1">
       <span className="text-muted text-xs uppercase tracking-wide">{label}</span>
       <span
         className={`font-semibold tabular-nums ${destacado ? "text-2xl" : "text-lg"}`}
@@ -56,8 +56,8 @@ function StatTile({ label, valor, destacado }: { label: string; valor: string; d
 }
 
 const tooltipStyle = {
-  background: "#171717",
-  border: "1px solid #262626",
+  background: "#131415",
+  border: "1px solid #232527",
   borderRadius: 8,
   color: CHART_CHROME.texto,
   fontSize: 13,
@@ -121,7 +121,7 @@ export function GraficosMes({
         </div>
       )}
 
-      <div className="bg-surface border border-border rounded-lg p-4">
+      <div className="card p-4">
         <h2 className="text-sm text-muted uppercase tracking-wide mb-3">
           Gasto acumulado — este mes vs mes anterior
         </h2>
@@ -158,7 +158,7 @@ export function GraficosMes({
         )}
       </div>
 
-      <div className="bg-surface border border-border rounded-lg p-4">
+      <div className="card p-4">
         <h2 className="text-sm text-muted uppercase tracking-wide mb-3">Por categoría</h2>
         {dataDonut.length === 0 ? (
           <p className="text-muted text-sm">Todavía no hay gastos este mes.</p>
@@ -203,7 +203,7 @@ export function GraficosMes({
         )}
       </div>
 
-      <div className="bg-surface border border-border rounded-lg p-4">
+      <div className="card p-4">
         <h2 className="text-sm text-muted uppercase tracking-wide mb-3">Top comercios</h2>
         {dataComercios.length === 0 ? (
           <p className="text-muted text-sm">Todavía no hay comercios registrados este mes.</p>

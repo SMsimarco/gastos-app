@@ -9,8 +9,8 @@ const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const fmt = (n: number) => Math.round(n).toLocaleString("es-AR");
 
 const tooltipStyle = {
-  background: "#171717",
-  border: "1px solid #262626",
+  background: "#131415",
+  border: "1px solid #232527",
   borderRadius: 8,
   color: CHART_CHROME.texto,
   fontSize: 13,
@@ -53,7 +53,7 @@ export function GraficoSemana({
         )}
       </div>
 
-      <div className="bg-surface border border-border rounded-lg p-4">
+      <div className="card p-4">
         <h2 className="text-sm text-muted uppercase tracking-wide mb-3">Por día</h2>
         {dataBarras.every((d) => d.total === 0) ? (
           <p className="text-muted text-sm">Todavía no hay gastos esta semana.</p>

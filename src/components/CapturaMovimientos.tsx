@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { IconMic, IconStop, IconSend, IconCamera, IconTrash } from "@/components/icons";
 
 type MovimientoFila = {
   id: string;
@@ -69,7 +70,7 @@ export function CapturaMovimientos({
           tipo: "warn",
         });
       } else if (nuevos.length > 0) {
-        setMensaje({ texto: `✅ Registrado${nuevos.length > 1 ? ` (${nuevos.length})` : ""}`, tipo: "ok" });
+        setMensaje({ texto: `Registrado${nuevos.length > 1 ? ` (${nuevos.length})` : ""}`, tipo: "ok" });
       } else {
         setMensaje({ texto: "No encontré ningún movimiento en eso.", tipo: "warn" });
       }
@@ -133,31 +134,38 @@ export function CapturaMovimientos({
       : null;
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-md mx-auto p-4 pb-10">
-      <div className="flex flex-col gap-1 pt-2">
-        <span className="text-muted text-xs uppercase tracking-wide">Gastado hoy</span>
-        <span className="text-4xl font-semibold tabular-nums">${fmt(totalHoyActual)}</span>
+    <div className="flex flex-col gap-7 w-full max-w-md mx-auto p-5 pb-12">
+      <div className="flex flex-col gap-1.5 pt-3">
+        <span className="text-muted text-xs font-medium uppercase tracking-widest">Gastado hoy</span>
+        <span className="text-5xl font-semibold tabular-nums tracking-tight">${fmt(totalHoyActual)}</span>
         {diferenciaPromedio !== null && (
           <span className="text-sm text-muted">
             {diferenciaPromedio > 0 ? "↑" : diferenciaPromedio < 0 ? "↓" : "="}{" "}
-            {Math.abs(diferenciaPromedio)}% vs. tu promedio diario del mes (${fmt(promedioDiario!)})
+            {Math.abs(diferenciaPromedio)}% vs. promedio diario del mes (${fmt(promedioDiario!)})
           </span>
         )}
       </div>
 
-      <div className="flex flex-col items-center gap-3 py-4">
+      <div className="flex flex-col items-center gap-4 py-6">
         <button
           onClick={grabando ? detenerGrabacion : iniciarGrabacion}
           disabled={procesando}
           aria-label={grabando ? "Parar grabación" : "Grabar audio"}
-          className={`relative w-24 h-24 rounded-full flex items-center justify-center text-4xl transition-colors disabled:opacity-50 ${
+          className={`pressable relative w-28 h-28 rounded-full flex items-center justify-center text-black transition-[background,box-shadow] disabled:opacity-50 ${
             grabando ? "bg-danger" : "bg-accent"
           }`}
+          style={{
+            boxShadow: grabando
+              ? "0 0 0 1px rgba(248,113,113,0.3), 0 12px 32px -8px rgba(248,113,113,0.45)"
+              : "0 0 0 1px rgba(52,211,153,0.3), 0 12px 32px -8px rgba(52,211,153,0.45)",
+          }}
         >
           {grabando && (
-            <span className="absolute inset-0 rounded-full bg-danger opacity-40 animate-ping" />
+            <span className="absolute inset-0 rounded-full bg-danger opacity-30 animate-ping" />
           )}
-          <span className="relative">{grabando ? "⏹️" : "🎙️"}</span>
+          <span className="relative">
+            {grabando ? <IconStop size={34} /> : <IconMic size={34} />}
+          </span>
         </button>
         <p className="text-muted text-sm h-5">
           {procesando ? "Procesando..." : grabando ? "Grabando, tocá para parar" : "Tocá para grabar"}
@@ -169,17 +177,18 @@ export function CapturaMovimientos({
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           placeholder="o escribí el gasto..."
-          className="flex-1 bg-surface border border-border rounded-lg px-4 py-3 text-base outline-none focus:border-accent transition-colors"
+          className="flex-1 bg-surface border border-border-soft rounded-xl px-4 py-3 text-base outline-none focus:border-accent transition-colors"
         />
         <button
           type="submit"
           disabled={procesando}
-          className="bg-surface border border-border rounded-lg px-4 py-3 disabled:opacity-50 hover:border-accent transition-colors"
+          aria-label="Enviar"
+          className="pressable bg-surface border border-border-soft rounded-xl px-4 py-3 disabled:opacity-50 hover:border-accent transition-colors text-muted hover:text-foreground"
         >
-          Enviar
+          <IconSend size={20} />
         </button>
-        <label className="bg-surface border border-border rounded-lg px-4 py-3 cursor-pointer hover:border-accent transition-colors">
-          📷
+        <label className="pressable bg-surface border border-border-soft rounded-xl px-4 py-3 cursor-pointer hover:border-accent transition-colors text-muted hover:text-foreground">
+          <IconCamera size={20} />
           <input type="file" accept="image/*" capture="environment" onChange={handleFoto} className="hidden" />
         </label>
       </form>
@@ -191,14 +200,14 @@ export function CapturaMovimientos({
       )}
 
       <div className="flex flex-col gap-2">
-        <h2 className="text-muted text-sm uppercase tracking-wide">Movimientos de hoy</h2>
+        <h2 className="text-muted text-xs font-medium uppercase tracking-widest">Movimientos de hoy</h2>
         {movimientos.length === 0 && (
-          <p className="text-muted text-sm">Todavía no registraste nada hoy.</p>
+          <p className="text-muted text-sm py-2">Todavía no registraste nada hoy.</p>
         )}
         {movimientos.map((m) => (
           <div
             key={m.id}
-            className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3"
+            className="card flex items-center justify-between px-4 py-3.5"
           >
             <div className="min-w-0">
               <p className="font-medium truncate">
@@ -212,16 +221,16 @@ export function CapturaMovimientos({
             <div className="flex items-center gap-3 shrink-0">
               <span
                 className="text-lg font-semibold tabular-nums"
-                style={{ color: m.tipo === "gasto" ? "#e66767" : "#22c55e" }}
+                style={{ color: m.tipo === "gasto" ? "#f87171" : "#34d399" }}
               >
                 {m.tipo === "gasto" ? "-" : "+"}${fmt(m.monto_ars)}
               </span>
               <button
                 onClick={() => borrarMovimiento(m.id)}
-                className="text-muted hover:text-danger text-sm p-1"
+                className="text-muted hover:text-danger p-1 transition-colors"
                 aria-label="Borrar"
               >
-                🗑
+                <IconTrash size={16} />
               </button>
             </div>
           </div>

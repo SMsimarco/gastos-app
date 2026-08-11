@@ -33,8 +33,8 @@ const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "O
 const fmt = (n: number) => Math.round(n).toLocaleString("es-AR");
 
 const tooltipStyle = {
-  background: "#171717",
-  border: "1px solid #262626",
+  background: "#131415",
+  border: "1px solid #232527",
   borderRadius: 8,
   color: CHART_CHROME.texto,
   fontSize: 13,
@@ -166,16 +166,16 @@ export function GraficoAnio({
         <p className="text-muted text-sm">Todavía no hay movimientos este año.</p>
       ) : (
         <>
-          <div className="bg-surface border border-border rounded-lg p-4">
+          <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm text-muted uppercase tracking-wide">Gasto por mes</h2>
-              <div className="flex gap-1 bg-background rounded-lg p-1">
+              <div className="flex gap-1 bg-surface-2 rounded-lg p-1">
                 {(["ARS", "USD"] as const).map((m) => (
                   <button
                     key={m}
                     onClick={() => setMoneda(m)}
-                    className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                      moneda === m ? "bg-accent text-black font-medium" : "text-muted"
+                    className={`pressable px-3 py-1 text-xs rounded-md transition-colors ${
+                      moneda === m ? "bg-accent text-black font-medium" : "text-muted hover:text-foreground"
                     }`}
                   >
                     {m}
@@ -197,7 +197,7 @@ export function GraficoAnio({
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-surface border border-border rounded-lg p-4">
+          <div className="card p-4">
             <h2 className="text-sm text-muted uppercase tracking-wide mb-3">
               Ingresos vs gastos — balance acumulado
             </h2>
@@ -222,7 +222,7 @@ export function GraficoAnio({
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-surface border border-border rounded-lg p-4">
+          <div className="card p-4">
             <h2 className="text-sm text-muted uppercase tracking-wide mb-3">Gasto por categoría en el año</h2>
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={dataArea}>
@@ -248,7 +248,7 @@ export function GraficoAnio({
         </>
       )}
 
-      <div className="bg-surface border border-border rounded-lg p-4">
+      <div className="card p-4">
         <h2 className="text-sm text-muted uppercase tracking-wide mb-3">Actividad diaria</h2>
         <Heatmap diario={diario} />
       </div>
