@@ -27,15 +27,17 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const esRutaLogin = request.nextUrl.pathname.startsWith("/login");
+  const esRutaPublica =
+    request.nextUrl.pathname.startsWith("/login") ||
+    request.nextUrl.pathname.startsWith("/signup");
 
-  if (!user && !esRutaLogin) {
+  if (!user && !esRutaPublica) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && esRutaLogin) {
+  if (user && esRutaPublica) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

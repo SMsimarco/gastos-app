@@ -60,10 +60,11 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const guardado = await guardarMovimiento(supabaseServicio, item, fuente);
+      const guardado = await guardarMovimiento(supabaseServicio, item, fuente, user.id);
       resultados.push({ guardado: true, ...guardado });
       await notificarTelegram(
-        `✅ Registrado desde la app\n${guardado.categoriaEmoji} ${guardado.categoriaNombre} — ${guardado.descripcion}\n$${guardado.monto_ars} · ${guardado.fecha}`
+        `✅ Registrado desde la app\n${guardado.categoriaEmoji} ${guardado.categoriaNombre} — ${guardado.descripcion}\n$${guardado.monto_ars} · ${guardado.fecha}`,
+        user.email ?? ""
       );
     } catch (error) {
       return NextResponse.json(

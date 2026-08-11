@@ -15,7 +15,11 @@ export async function DELETE(
 
   const { id } = await params;
   const supabaseServicio = crearClienteServicio();
-  const { error } = await supabaseServicio.from("movimientos").delete().eq("id", id);
+  const { error } = await supabaseServicio
+    .from("movimientos")
+    .delete()
+    .eq("id", id)
+    .eq("usuario_id", user.id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

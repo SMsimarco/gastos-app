@@ -5,11 +5,13 @@ type CategoriaInfo = { id: string; emoji: string; nombre: string };
 
 async function resolverCategoria(
   supabase: SupabaseClient,
-  item: Movimiento
+  item: Movimiento,
+  usuarioId: string
 ): Promise<CategoriaInfo> {
   const { data: reglas } = await supabase
     .from("reglas_comercio")
-    .select("patron, categorias(id, emoji, nombre)");
+    .select("patron, categorias(id, emoji, nombre)")
+    .eq("usuario_id", usuarioId);
 
   const textoBusqueda = `${item.comercio ?? ""} ${item.descripcion}`.toLowerCase();
   const regla = (reglas ?? []).find((r) =>
@@ -42,9 +44,10 @@ async function obtenerUltimoTC(supabase: SupabaseClient): Promise<number | null>
 export async function guardarMovimiento(
   supabase: SupabaseClient,
   item: Movimiento,
-  fuente: "audio" | "texto" | "foto"
+  fuente: "audio" | "texto" | "foto",
+  usuarioId: string
 ) {
-  const categoria = await resolverCategoria(supabase, item);
+  const categoria = await resolverCategoria(supabase, item, usuarioId);
   const tcUsado = await obtenerUltimoTC(supabase);
 
   const montoArs = item.moneda === "ARS" ? item.monto : tcUsado ? Number((item.monto * tcUsado).toFixed(2)) : item.monto;
@@ -55,6 +58,7 @@ export async function guardarMovimiento(
   const { data, error } = await supabase
     .from("movimientos")
     .insert({
+      usuario_id: usuarioId,
       tipo: item.tipo,
       fecha: item.fecha,
       monto_ars: montoArs,
