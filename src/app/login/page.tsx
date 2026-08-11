@@ -55,7 +55,7 @@ function LoginForm() {
           <Image src="/icon-512.png" alt="gastos-voz" width={88} height={88} priority />
           <div className="text-center">
             <h1 className="text-xl font-semibold tracking-tight">gastos-voz</h1>
-            <p className="text-muted text-sm mt-0.5">Registrá tus gastos hablando</p>
+            <p className="text-muted text-sm mt-0.5">Registrá tus gastos por voz, escribiendo o con una foto de tu ticket</p>
           </div>
         </div>
 
