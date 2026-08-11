@@ -1,76 +1,98 @@
 # gastos-voz
 
-Sistema personal de registro de gastos e ingresos. Captura principal por audio de Telegram, visualización en PWA. Un solo usuario, sin SaaS.
+Sistema personal de registro de gastos e ingresos. Todo vive en una sola PWA: capturás por voz/texto/foto y ves los gráficos en el mismo lugar. Un solo usuario, sin SaaS.
 
-Arquitectura: Telegram (audio/texto/foto) → n8n → Gemini Flash (extracción estructurada) → Supabase → PWA con gráficos.
+Arquitectura: PWA (Next.js, Vercel) → API routes propias → Gemini Flash (extracción estructurada) → Supabase. Notificaciones salientes por Telegram (solo avisos, no captura).
 
 Ver `NOTES.md` para el detalle de verificación de la API de Gemini (modelo, endpoint, structured output).
 
-## 1. Crear el bot en BotFather
+> **Nota:** el proyecto arrancó con captura por n8n + Telegram (carpeta `n8n/`, ver commits viejos). Se retiró n8n del flujo de captura por la fricción de editar workflows a mano — queda como referencia, no se sigue desarrollando. `WF04` (recurrentes) y `WF05` (tipo de cambio) todavía están pendientes de portar a cron jobs de Vercel.
 
-1. Hablále a [@BotFather](https://t.me/BotFather) en Telegram.
-2. `/newbot` → elegí nombre y username (debe terminar en `bot`).
-3. Guardá el token que te da (`TELEGRAM_BOT_TOKEN`).
-4. Mandale un mensaje cualquiera a tu bot nuevo desde tu cuenta.
-5. Para obtener tu `chat_id`: abrí `https://api.telegram.org/bot<TOKEN>/getUpdates` en el navegador después de mandarle el mensaje, y buscá `"chat":{"id": ...}` en la respuesta. Ese número es `MY_TELEGRAM_CHAT_ID`.
+## 1. Supabase
 
-## 2. Variables de entorno (Easypanel / Docker Compose de n8n)
+### Migraciones
+
+Corré en orden desde el SQL Editor de Supabase (o `supabase db push` si tenés la CLI linkeada):
 
 ```
-MY_TELEGRAM_CHAT_ID=123456789
-GEMINI_API_KEY=AIza...
-SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
-NODE_FUNCTION_ALLOW_EXTERNAL=axios
+supabase/migrations/0001_init.sql
+supabase/migrations/0002_seeds.sql
+supabase/migrations/0003_agregaciones.sql
+supabase/migrations/0004_categoria_alimentos.sql
 ```
 
-`TELEGRAM_BOT_TOKEN` **no** va como env var acá — se configura como credencial nativa de n8n (ver paso 3). Los Code nodes usan `axios` para llamar a Gemini y Supabase directamente (mismo patrón que otros proyectos), por eso necesitan `NODE_FUNCTION_ALLOW_EXTERNAL=axios`.
+Verificá: `select count(*) from categorias;` → 17.
 
-Reiniciá el contenedor de n8n después de agregar las env vars.
+### Usuario de login
 
-## 3. Credencial de Telegram en n8n
+La app tiene un solo usuario. Creálo en Supabase → Authentication → Users → **Add user**, con email + contraseña, marcado como confirmado (no hace falta que mande mail de verificación).
 
-En n8n: Credentials → New → Telegram API → pegá el `TELEGRAM_BOT_TOKEN` de BotFather. Nombrala **"Telegram Bot gastos-voz"** (así matchea el nombre que trae el JSON — igual vas a tener que remapear el `credentialId` al importar, es normal, cada instancia de n8n tiene sus propios IDs).
+### Claves que necesitás
 
-## 4. Migraciones de Supabase
+Supabase → Settings → API:
+- **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
+- **anon / public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- **service_role key** (dice "secret" al lado) → `SUPABASE_SERVICE_ROLE_KEY`
 
-Corré en orden, desde el SQL Editor de Supabase o con la CLI:
+## 2. Gemini
+
+`GEMINI_API_KEY` desde [aistudio.google.com](https://aistudio.google.com) → Get API key.
+
+## 3. Telegram (solo notificaciones)
+
+1. Bot ya creado con BotFather (`@gastamos_bot` si es el mismo de antes) → `TELEGRAM_BOT_TOKEN`.
+2. Tu `chat_id` (sacalo con `https://api.telegram.org/bot<TOKEN>/getUpdates` después de mandarle un mensaje al bot) → `MY_TELEGRAM_CHAT_ID`.
+
+Esto es opcional — si no lo configurás, la app funciona igual, simplemente no manda avisos.
+
+## 4. Variables de entorno
+
+Copiá `.env.example` a `.env.local` y completá:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+GEMINI_API_KEY=
+TELEGRAM_BOT_TOKEN=
+MY_TELEGRAM_CHAT_ID=
+```
+
+## 5. Correr local
 
 ```bash
-# opción CLI (si tenés supabase-cli configurado con el proyecto linkeado)
-supabase db push
-
-# opción manual: pegar cada archivo en el SQL Editor del dashboard, en orden
-# 0001_init.sql
-# 0002_seeds.sql
-# 0003_agregaciones.sql
+npm install
+npm run dev
 ```
 
-Verificá después:
-```sql
-select count(*) from categorias; -- debería dar 16
+Abrí `http://localhost:3000`, te redirige a `/login`. Entrá con el usuario que creaste en Supabase.
+
+## 6. Deploy en Vercel
+
+```bash
+vercel link
+vercel env pull   # o cargá las mismas env vars de arriba en el dashboard de Vercel
+vercel --prod
 ```
 
-## 5. Importar el workflow en n8n
+## 7. Probar con datos reales (antes de dar la captura por buena)
 
-1. n8n → Workflows → Import from File → `n8n/01_captura_audio.json`.
-2. Reasigná la credencial de Telegram en los 4 nodos que la usan (Trigger + 3 de mensaje/archivo).
-3. **Revisá el nodo Telegram Trigger:** al activar el workflow, n8n genera el webhook automáticamente — no hace falta configurarlo a mano en BotFather.
-4. Dejalo **desactivado** hasta probarlo manualmente una vez (podés ejecutar el workflow a mano desde el editor mandándote un audio de prueba primero, con "Listen for test event").
-
-## 6. Probar con audio real (antes de dar la rama por buena)
-
-Mandale un audio a tu bot diciendo algo simple: *"cargué 20 lucas de nafta en efectivo"*. Revisá:
-
-- Que `Code - Gemini extraccion` devuelva el JSON esperado (abrí la ejecución en n8n y mirá el output del nodo).
-- Que se haya insertado la fila en `movimientos` en Supabase.
-- Que te llegue el mensaje de confirmación con los 3 botones.
-- Probá también un audio ambiguo tipo *"gasté algo de plata"* → debería responder pidiendo aclaración, sin insertar nada.
-
-Si Gemini rechaza el audio OGG de Telegram (poco probable según la doc, pero puede pasar con algún códec raro), hay que agregar un paso de conversión a MP3 con ffmpeg vía Execute Command antes del nodo `Code - Gemini extraccion` — no está implementado todavía porque no se puede confirmar que haga falta sin probar con audio real primero.
+- Grabá un audio corto: "gasté 500 pesos en el kiosco" → tiene que aparecer en la lista de "Hoy" al toque.
+- Probá un texto ambiguo: "gasté algo de plata" → tiene que avisar que no entendió el monto, sin registrar nada.
+- Sacale foto a un ticket cualquiera y mandala.
+- Borrá un movimiento con el 🗑 de la lista y confirmá que desaparece de Supabase también.
 
 ## Notas de arquitectura
 
-- **Supabase vía Code+axios, no nodo nativo:** el nodo nativo de Supabase con `getAll` devuelve 0 items si no matchea ningún row, lo que hace que el item desaparezca en silencio en vez de insertarse con `categoria_id: null`. Con axios controlamos ese caso explícitamente.
-- **Manejo de errores:** cada nodo crítico tiene `onError: continueErrorOutput`, así que cualquier falla (Telegram caído, Gemini con error, Supabase rechazando el insert) manda una alerta por Telegram en vez de fallar en silencio.
-- **Nodos de Telegram/Supabase con schema no 100% verificado:** los armé con la estructura estándar de n8n (`inlineKeyboard`, filtros REST), pero no los pude probar contra una instancia real. Si algo no importa bien, es más probable que sea el nodo `Telegram - Confirmar registro` (el `inlineKeyboard`) — si tira error al importar, reconstruí los 3 botones a mano desde la UI, es rápido.
+- **Auth:** Supabase Auth con `@supabase/ssr`, sesión en cookies, `proxy.ts` (ex-`middleware.ts`, renombrado en Next 16) protege todas las rutas menos `/login`.
+- **service_role solo en el servidor:** las API routes verifican la sesión del usuario primero (`crearClienteServidor`), y recién después usan `crearClienteServicio` (service_role, bypassea RLS) para escribir. Nunca se expone la service_role key al browser.
+- **Categorización:** mismo criterio que tenía n8n — primero busca en `reglas_comercio` (patrón de texto → categoría fija), si no matchea usa la categoría que sugirió Gemini.
+- **Tema oscuro fijo** (no sigue el tema del sistema), mobile-first, sin gradientes ni sombras exageradas — como pediste en la spec original.
+
+## Pendiente
+
+- Vistas Semana / Mes / Año / Todos de la PWA (por ahora solo está "Hoy").
+- Cuotas (insert padre + N-1 hijos).
+- WF04/WF05 (recurrentes y tipo de cambio) portados a Vercel Cron.
+- Consultas en lenguaje natural + digest semanal/mensual.
+- Iconos reales del manifest (`/icon-192.png`, `/icon-512.png` son referencias sin archivo todavía).
