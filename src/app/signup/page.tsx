@@ -52,14 +52,19 @@ export default function SignupPage() {
   return (
     <main className="flex-1 flex items-center justify-center p-6">
       <form onSubmit={handleSubmit} className="w-full max-w-sm flex flex-col gap-4">
-        <h1 className="text-2xl font-semibold mb-2">Crear cuenta — gastos-voz</h1>
+        <div className="flex flex-col items-center gap-3 mb-2">
+          <div className="w-14 h-14 rounded-2xl border-2 border-accent flex items-center justify-center text-2xl font-bold text-accent">
+            $
+          </div>
+          <h1 className="text-xl font-semibold">Crear cuenta</h1>
+        </div>
 
         <input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="bg-surface border border-border rounded-lg px-4 py-3 text-base outline-none focus:border-accent"
+          className="bg-surface border border-border rounded-lg px-4 py-3 text-base outline-none focus:border-accent transition-colors"
           required
         />
         <input
@@ -68,7 +73,7 @@ export default function SignupPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           minLength={6}
-          className="bg-surface border border-border rounded-lg px-4 py-3 text-base outline-none focus:border-accent"
+          className="bg-surface border border-border rounded-lg px-4 py-3 text-base outline-none focus:border-accent transition-colors"
           required
         />
 
@@ -77,7 +82,7 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={cargando}
-          className="bg-accent text-black font-medium rounded-lg px-4 py-3 disabled:opacity-50"
+          className="bg-accent text-black font-medium rounded-lg px-4 py-3 disabled:opacity-50 hover:brightness-110 transition-[filter]"
         >
           {cargando ? "Creando..." : "Crear cuenta"}
         </button>
