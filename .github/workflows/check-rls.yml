@@ -1,0 +1,13 @@
+name: Check RLS
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check-rls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-rls.sh
