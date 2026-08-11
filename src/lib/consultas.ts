@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { interpretarPregunta } from "./gemini";
+import { obtenerListasCategorias } from "./categorias";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("es-AR");
 
@@ -8,7 +9,8 @@ export async function responderConsulta(
   usuarioId: string,
   pregunta: string
 ): Promise<string> {
-  const filtros = await interpretarPregunta(pregunta);
+  const categorias = await obtenerListasCategorias(supabase, usuarioId);
+  const filtros = await interpretarPregunta(pregunta, categorias);
 
   let query = supabase
     .from("movimientos")
@@ -24,6 +26,7 @@ export async function responderConsulta(
       .select("id")
       .eq("nombre", filtros.categoriaNombre)
       .eq("tipo", filtros.tipo)
+      .or(`usuario_id.is.null,usuario_id.eq.${usuarioId}`)
       .maybeSingle();
     if (cat) query = query.eq("categoria_id", cat.id);
   }

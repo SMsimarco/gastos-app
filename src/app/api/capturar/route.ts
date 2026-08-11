@@ -5,6 +5,8 @@ import { guardarMovimiento } from "@/lib/movimientos";
 import { chequearPresupuestoExcedido } from "@/lib/presupuestos";
 import { responderConsulta } from "@/lib/consultas";
 import { enviarPush } from "@/lib/push";
+import { obtenerListasCategorias } from "@/lib/categorias";
+import { subirFotoTicket } from "@/lib/storage";
 
 export async function POST(request: NextRequest) {
   const supabaseAuth = await crearClienteServidor();
@@ -23,6 +25,7 @@ export async function POST(request: NextRequest) {
   let base64Data: string | undefined;
   let mimeType: string | undefined;
   let fuente: "audio" | "texto" | "foto" = "texto";
+  let fotoBuffer: Buffer | undefined;
 
   if (audio) {
     const buffer = Buffer.from(await audio.arrayBuffer());
@@ -34,23 +37,25 @@ export async function POST(request: NextRequest) {
     base64Data = buffer.toString("base64");
     mimeType = foto.type || "image/jpeg";
     fuente = "foto";
+    fotoBuffer = buffer;
   } else if (!texto) {
     return NextResponse.json({ error: "Mandá audio, foto o texto" }, { status: 400 });
   }
 
   const supabaseServicio = crearClienteServicio();
+  const categorias = await obtenerListasCategorias(supabaseServicio, user.id);
 
   let movimientos: Movimiento[];
   try {
     if (fuente === "texto" && texto) {
-      const resultado = await clasificarYExtraerTexto(texto);
+      const resultado = await clasificarYExtraerTexto(texto, categorias);
       if (resultado.intencion === "consulta") {
         const respuesta = await responderConsulta(supabaseServicio, user.id, resultado.pregunta);
         return NextResponse.json({ tipo: "consulta", respuesta });
       }
       movimientos = resultado.movimientos;
     } else {
-      movimientos = await extraerMovimientos({ base64Data, mimeType, textoMensaje: texto ?? undefined });
+      movimientos = await extraerMovimientos({ base64Data, mimeType, textoMensaje: texto ?? undefined, categorias });
     }
   } catch (error) {
     return NextResponse.json(
@@ -58,6 +63,8 @@ export async function POST(request: NextRequest) {
       { status: 502 }
     );
   }
+
+  const fotoPath = fotoBuffer ? await subirFotoTicket(supabaseServicio, user.id, fotoBuffer) : null;
 
   const resultados = [];
 
@@ -68,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const guardado = await guardarMovimiento(supabaseServicio, item, fuente, user.id);
+      const guardado = await guardarMovimiento(supabaseServicio, item, fuente, user.id, fotoPath);
       resultados.push({ guardado: true, ...guardado });
 
       const infoCuotas =

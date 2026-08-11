@@ -28,11 +28,13 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const esApi = request.nextUrl.pathname.startsWith("/api/");
+  const esAuthCallback = request.nextUrl.pathname.startsWith("/auth/");
   const esAuthPage =
     request.nextUrl.pathname.startsWith("/login") || request.nextUrl.pathname.startsWith("/signup");
 
   // Las API routes validan su propia auth (sesion de usuario o CRON_SECRET) — el proxy no interviene.
-  if (esApi) return response;
+  // /auth/callback corre justo cuando todavia no hay sesion (se esta creando ahi mismo).
+  if (esApi || esAuthCallback) return response;
 
   if (!user && !esAuthPage) {
     const url = request.nextUrl.clone();

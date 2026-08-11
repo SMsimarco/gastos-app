@@ -26,6 +26,7 @@ async function resolverCategoria(
     .select("id, emoji, nombre")
     .eq("nombre", item.categoria)
     .eq("tipo", item.tipo)
+    .or(`usuario_id.is.null,usuario_id.eq.${usuarioId}`)
     .limit(1);
 
   if (categorias && categorias.length > 0) return categorias[0];
@@ -56,7 +57,8 @@ export async function guardarMovimiento(
   supabase: SupabaseClient,
   item: Movimiento,
   fuente: "audio" | "texto" | "foto",
-  usuarioId: string
+  usuarioId: string,
+  fotoPath: string | null = null
 ) {
   const categoria = await resolverCategoria(supabase, item, usuarioId);
   const tcUsado = await obtenerUltimoTC(supabase);
@@ -90,6 +92,7 @@ export async function guardarMovimiento(
     metodo_pago: item.metodo_pago || null,
     fuente,
     confianza: item.confianza,
+    foto_path: fotoPath,
   };
 
   const { data: padre, error } = await supabase

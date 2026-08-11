@@ -12,7 +12,7 @@ export type Movimiento = {
   transcripcion_raw: string;
 };
 
-const CATEGORIAS_GASTO = [
+const CATEGORIAS_GASTO_DEFAULT = [
   "Supermercado",
   "Delivery/Restaurantes",
   "Alimentos",
@@ -27,7 +27,12 @@ const CATEGORIAS_GASTO = [
   "Impuestos",
   "Otros",
 ];
-const CATEGORIAS_INGRESO = ["Clientes", "Sueldo", "Ventas", "Otros"];
+const CATEGORIAS_INGRESO_DEFAULT = ["Clientes", "Sueldo", "Ventas", "Otros"];
+
+export type ListasCategorias = {
+  gasto: string[];
+  ingreso: string[];
+};
 
 async function generarJSON(parts: Array<Record<string, unknown>>, schema: Record<string, unknown>) {
   const res = await fetch(
@@ -57,7 +62,7 @@ async function generarJSON(parts: Array<Record<string, unknown>>, schema: Record
   return JSON.parse(textoRespuesta);
 }
 
-function construirPrompt(fechaHoyAR: string) {
+function construirPrompt(fechaHoyAR: string, categorias: ListasCategorias) {
   return `Sos un extractor de movimientos financieros a partir de un mensaje (audio, foto de ticket, o texto) en español rioplatense (Argentina).
 Fecha de hoy: ${fechaHoyAR} (timezone America/Argentina/Buenos_Aires). Resolvé fechas relativas ("ayer", "el viernes pasado") contra esta fecha, nunca uses UTC.
 
@@ -72,12 +77,12 @@ Reglas de argot monetario argentino:
 - "un verde" = 1 USD (y en general "verdes" = dólares)
 - "facturas" (en contexto de compra de comida) son medialunas/pastelitos de panadería, NO boletas de servicios
 
-Compras de comida que NO son supermercado ni delivery/restaurante (panadería, verdulería, carnicería, kiosco, almacén) van en categoria "Alimentos". Poné en descripcion el detalle específico (ej. "facturas de panadería", "verdura", "fiambre") para poder diferenciar cada compra aunque compartan categoría.
+Compras de comida que NO son supermercado ni delivery/restaurante (panadería, verdulería, carnicería, kiosco, almacén) van en categoria "Alimentos" si esa categoría está en la lista de abajo; si no existe, usá la más parecida de la lista. Poné en descripcion el detalle específico (ej. "facturas de panadería", "verdura", "fiambre") para poder diferenciar cada compra aunque compartan categoría.
 
 Cuotas: si mencionan pago en cuotas ("en 3 cuotas", "en 6 pagos", "lo pagué en 12"), poné ese número en cuotas. Si no dicen nada de cuotas, poné cuotas: 1. El monto que des es el TOTAL de la compra (no dividas vos por cuota, eso lo hace el sistema después).
 
-Categorías válidas para tipo=gasto: ${CATEGORIAS_GASTO.join(", ")}
-Categorías válidas para tipo=ingreso: ${CATEGORIAS_INGRESO.join(", ")}
+Categorías válidas para tipo=gasto (usá EXACTAMENTE uno de estos nombres): ${categorias.gasto.join(", ")}
+Categorías válidas para tipo=ingreso (usá EXACTAMENTE uno de estos nombres): ${categorias.ingreso.join(", ")}
 
 Si NO podés determinar el monto con confianza razonable, poné confianza "baja" y NO inventes un número (poné monto en 0).
 Guardá siempre en transcripcion_raw una transcripción fiel de lo que se dijo o del texto/ticket recibido.`;
@@ -119,12 +124,14 @@ export async function extraerMovimientos(input: {
   base64Data?: string;
   mimeType?: string;
   textoMensaje?: string;
+  categorias?: ListasCategorias;
 }): Promise<Movimiento[]> {
   const fechaHoyAR = new Date().toLocaleDateString("en-CA", {
     timeZone: "America/Argentina/Buenos_Aires",
   });
+  const categorias = input.categorias ?? { gasto: CATEGORIAS_GASTO_DEFAULT, ingreso: CATEGORIAS_INGRESO_DEFAULT };
 
-  const parts: Array<Record<string, unknown>> = [{ text: construirPrompt(fechaHoyAR) }];
+  const parts: Array<Record<string, unknown>> = [{ text: construirPrompt(fechaHoyAR, categorias) }];
   if (input.base64Data && input.mimeType) {
     parts.push({ inlineData: { mimeType: input.mimeType, data: input.base64Data } });
   } else if (input.textoMensaje) {
@@ -138,12 +145,16 @@ export type ResultadoTexto =
   | { intencion: "registro"; movimientos: Movimiento[] }
   | { intencion: "consulta"; pregunta: string };
 
-export async function clasificarYExtraerTexto(textoMensaje: string): Promise<ResultadoTexto> {
+export async function clasificarYExtraerTexto(
+  textoMensaje: string,
+  categorias?: ListasCategorias
+): Promise<ResultadoTexto> {
   const fechaHoyAR = new Date().toLocaleDateString("en-CA", {
     timeZone: "America/Argentina/Buenos_Aires",
   });
+  const listas = categorias ?? { gasto: CATEGORIAS_GASTO_DEFAULT, ingreso: CATEGORIAS_INGRESO_DEFAULT };
 
-  const prompt = `${construirPrompt(fechaHoyAR)}
+  const prompt = `${construirPrompt(fechaHoyAR, listas)}
 
 Antes que nada, decidí la intención del mensaje:
 - "registro": el usuario está contando un gasto o ingreso nuevo para guardar.
@@ -180,10 +191,14 @@ export type FiltrosConsulta = {
   tipo: "gasto" | "ingreso";
 };
 
-export async function interpretarPregunta(pregunta: string): Promise<FiltrosConsulta> {
+export async function interpretarPregunta(
+  pregunta: string,
+  categorias?: ListasCategorias
+): Promise<FiltrosConsulta> {
   const fechaHoyAR = new Date().toLocaleDateString("en-CA", {
     timeZone: "America/Argentina/Buenos_Aires",
   });
+  const listas = categorias ?? { gasto: CATEGORIAS_GASTO_DEFAULT, ingreso: CATEGORIAS_INGRESO_DEFAULT };
 
   const prompt = `Traducí esta pregunta sobre finanzas personales a filtros de fecha/categoría.
 Fecha de hoy: ${fechaHoyAR} (timezone America/Argentina/Buenos_Aires).
@@ -191,7 +206,7 @@ Fecha de hoy: ${fechaHoyAR} (timezone America/Argentina/Buenos_Aires).
 "la semana pasada" = los 7 días anteriores a hoy.
 "ayer" = el día calendario anterior a hoy (desde y hasta iguales).
 Si no menciona ninguna categoría específica, categoriaNombre debe ser null.
-Categorías válidas (usar el nombre EXACTO si aplica alguna): ${CATEGORIAS_GASTO.join(", ")}, ${CATEGORIAS_INGRESO.join(", ")}.
+Categorías válidas (usar el nombre EXACTO si aplica alguna): ${listas.gasto.join(", ")}, ${listas.ingreso.join(", ")}.
 Si no dice explícitamente "ingreso"/"cobré"/"me pagaron", asumí tipo "gasto".
 
 Pregunta: "${pregunta}"`;

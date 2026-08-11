@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { IconEdit, IconTrash } from "@/components/icons";
+import { IconEdit, IconTrash, IconCamera } from "@/components/icons";
 
 type Categoria = { id: string; nombre: string; emoji: string; tipo: string };
 
@@ -18,6 +18,7 @@ type MovimientoFila = {
   categoria_id: string | null;
   cuotas_total: number;
   cuota_nro: number;
+  foto_path: string | null;
   categorias: { nombre: string; emoji: string } | null;
 };
 
@@ -94,15 +95,30 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
     await fetch(`/api/movimientos/${id}`, { method: "DELETE" });
   }
 
+  async function verFoto(id: string) {
+    const res = await fetch(`/api/movimientos/${id}/foto`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.url) window.open(data.url, "_blank");
+  }
+
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editMonto, setEditMonto] = useState("");
   const [editCategoriaId, setEditCategoriaId] = useState("");
+  const [editDescripcion, setEditDescripcion] = useState("");
+  const [editComercio, setEditComercio] = useState("");
+  const [editMetodoPago, setEditMetodoPago] = useState("");
+  const [editFecha, setEditFecha] = useState("");
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
   function empezarEdicion(m: MovimientoFila) {
     setEditandoId(m.id);
     setEditMonto(String(m.monto_ars));
     setEditCategoriaId(m.categoria_id ?? "");
+    setEditDescripcion(m.descripcion ?? "");
+    setEditComercio(m.comercio ?? "");
+    setEditMetodoPago(m.metodo_pago ?? "");
+    setEditFecha(m.fecha);
   }
 
   async function guardarEdicion(id: string) {
@@ -111,7 +127,14 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
       const res = await fetch(`/api/movimientos/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ monto_ars: Number(editMonto), categoria_id: editCategoriaId || null }),
+        body: JSON.stringify({
+          monto_ars: Number(editMonto),
+          categoria_id: editCategoriaId || null,
+          descripcion: editDescripcion,
+          comercio: editComercio || null,
+          metodo_pago: editMetodoPago || null,
+          fecha: editFecha,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -229,14 +252,28 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
           movimientos.map((m) =>
             editandoId === m.id ? (
               <div key={m.id} className="card border-accent px-4 py-3 flex flex-col gap-2">
-                <p className="text-sm text-muted truncate">{m.descripcion}</p>
+                <input
+                  value={editDescripcion}
+                  onChange={(e) => setEditDescripcion(e.target.value)}
+                  placeholder="Descripción"
+                  className={inputCls}
+                />
                 <div className="grid grid-cols-2 gap-2">
                   <input
                     type="number"
                     value={editMonto}
                     onChange={(e) => setEditMonto(e.target.value)}
+                    placeholder="Monto"
                     className={inputCls}
                   />
+                  <input
+                    type="date"
+                    value={editFecha}
+                    onChange={(e) => setEditFecha(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
                   <select
                     value={editCategoriaId}
                     onChange={(e) => setEditCategoriaId(e.target.value)}
@@ -251,7 +288,25 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
                         </option>
                       ))}
                   </select>
+                  <select
+                    value={editMetodoPago}
+                    onChange={(e) => setEditMetodoPago(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">Sin método</option>
+                    {METODOS_PAGO.map((mp) => (
+                      <option key={mp} value={mp}>
+                        {mp}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+                <input
+                  value={editComercio}
+                  onChange={(e) => setEditComercio(e.target.value)}
+                  placeholder="Comercio (opcional)"
+                  className={inputCls}
+                />
                 <div className="flex gap-2">
                   <button
                     onClick={() => guardarEdicion(m.id)}
@@ -291,6 +346,15 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
                   >
                     {m.tipo === "gasto" ? "-" : "+"}${fmt(m.monto_ars)}
                   </span>
+                  {m.foto_path && (
+                    <button
+                      onClick={() => verFoto(m.id)}
+                      className="text-muted hover:text-foreground p-1 transition-colors"
+                      aria-label="Ver ticket"
+                    >
+                      <IconCamera size={16} />
+                    </button>
+                  )}
                   <button
                     onClick={() => empezarEdicion(m)}
                     className="text-muted hover:text-foreground p-1 transition-colors"

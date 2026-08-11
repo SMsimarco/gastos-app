@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor, crearClienteServicio } from "@/lib/supabase/server";
 
-const CAMPOS_EDITABLES = ["monto_ars", "categoria_id", "descripcion", "comercio", "metodo_pago"] as const;
+const CAMPOS_EDITABLES = ["monto_ars", "categoria_id", "descripcion", "comercio", "metodo_pago", "fecha"] as const;
 
 export async function PATCH(
   request: NextRequest,
