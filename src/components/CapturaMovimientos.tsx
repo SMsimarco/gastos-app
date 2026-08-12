@@ -18,6 +18,48 @@ type MovimientoFila = {
 
 const fmt = (n: number) => Math.round(n).toLocaleString("es-AR");
 
+function audioBufferAWav(buffer: AudioBuffer): Blob {
+  const numChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const numFrames = buffer.length;
+  const blockAlign = numChannels * 2;
+  const dataSize = numFrames * blockAlign;
+  const arrayBuffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(arrayBuffer);
+
+  const escribirString = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  };
+
+  escribirString(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  escribirString(8, "WAVE");
+  escribirString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  escribirString(36, "data");
+  view.setUint32(40, dataSize, true);
+
+  const canales: Float32Array[] = [];
+  for (let ch = 0; ch < numChannels; ch++) canales.push(buffer.getChannelData(ch));
+
+  let offset = 44;
+  for (let frame = 0; frame < numFrames; frame++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      const s = Math.max(-1, Math.min(1, canales[ch][frame]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      offset += 2;
+    }
+  }
+
+  return new Blob([arrayBuffer], { type: "audio/wav" });
+}
+
 export function CapturaMovimientos({
   movimientosIniciales,
   totalHoy,
@@ -147,25 +189,6 @@ export function CapturaMovimientos({
     }
   }
 
-  async function tieneSenalDeAudio(blob: Blob) {
-    try {
-      const ctx = new AudioContext();
-      const audioBuffer = await ctx.decodeAudioData(await blob.arrayBuffer());
-      let pico = 0;
-      for (let canal = 0; canal < audioBuffer.numberOfChannels; canal++) {
-        const datos = audioBuffer.getChannelData(canal);
-        for (let i = 0; i < datos.length; i++) {
-          const abs = Math.abs(datos[i]);
-          if (abs > pico) pico = abs;
-        }
-      }
-      await ctx.close();
-      return pico > 0.02;
-    } catch {
-      return true;
-    }
-  }
-
   async function iniciarGrabacion() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mediaRecorder = new MediaRecorder(stream);
@@ -174,9 +197,27 @@ export function CapturaMovimientos({
     mediaRecorder.ondataavailable = (e) => chunksRef.current.push(e.data);
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop());
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+      const blobWebm = new Blob(chunksRef.current, { type: "audio/webm" });
 
-      if (!(await tieneSenalDeAudio(blob))) {
+      let audioBuffer: AudioBuffer;
+      try {
+        const ctx = new AudioContext();
+        audioBuffer = await ctx.decodeAudioData(await blobWebm.arrayBuffer());
+        await ctx.close();
+      } catch {
+        setMensaje({ texto: "⚠️ No se pudo procesar el audio grabado. Probá de nuevo.", tipo: "warn" });
+        return;
+      }
+
+      let pico = 0;
+      for (let canal = 0; canal < audioBuffer.numberOfChannels; canal++) {
+        const datos = audioBuffer.getChannelData(canal);
+        for (let i = 0; i < datos.length; i++) {
+          const abs = Math.abs(datos[i]);
+          if (abs > pico) pico = abs;
+        }
+      }
+      if (pico <= 0.02) {
         setMensaje({
           texto: "🎙️ No se detectó sonido en la grabación. Revisá permisos/dispositivo de micrófono.",
           tipo: "warn",
@@ -184,9 +225,11 @@ export function CapturaMovimientos({
         return;
       }
 
+      // Gemini no soporta audio/webm (formato que graba MediaRecorder) — se re-codifica a WAV, que sí soporta.
+      const blobWav = audioBufferAWav(audioBuffer);
       const formData = new FormData();
-      formData.append("audio", blob, "audio.webm");
-      await enviarCaptura(formData, { tipo: "audio", blob, nombreArchivo: "audio.webm" });
+      formData.append("audio", blobWav, "audio.wav");
+      await enviarCaptura(formData, { tipo: "audio", blob: blobWav, nombreArchivo: "audio.wav" });
     };
 
     mediaRecorder.start();
