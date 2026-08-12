@@ -147,6 +147,25 @@ export function CapturaMovimientos({
     }
   }
 
+  async function tieneSenalDeAudio(blob: Blob) {
+    try {
+      const ctx = new AudioContext();
+      const audioBuffer = await ctx.decodeAudioData(await blob.arrayBuffer());
+      let pico = 0;
+      for (let canal = 0; canal < audioBuffer.numberOfChannels; canal++) {
+        const datos = audioBuffer.getChannelData(canal);
+        for (let i = 0; i < datos.length; i++) {
+          const abs = Math.abs(datos[i]);
+          if (abs > pico) pico = abs;
+        }
+      }
+      await ctx.close();
+      return pico > 0.02;
+    } catch {
+      return true;
+    }
+  }
+
   async function iniciarGrabacion() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mediaRecorder = new MediaRecorder(stream);
@@ -156,6 +175,15 @@ export function CapturaMovimientos({
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop());
       const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+
+      if (!(await tieneSenalDeAudio(blob))) {
+        setMensaje({
+          texto: "🎙️ No se detectó sonido en la grabación. Revisá permisos/dispositivo de micrófono.",
+          tipo: "warn",
+        });
+        return;
+      }
+
       const formData = new FormData();
       formData.append("audio", blob, "audio.webm");
       await enviarCaptura(formData, { tipo: "audio", blob, nombreArchivo: "audio.webm" });
