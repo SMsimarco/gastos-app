@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -39,6 +40,15 @@ type AcumuladoDia = { fecha: string; total_dia: number; acumulado: number };
 
 type Comercio = { comercio: string; total_ars: number; cantidad: number };
 
+export type Gasto = {
+  id: string;
+  descripcion: string;
+  fecha: string;
+  monto_ars: number;
+  comercio: string | null;
+  categorias: { nombre: string; emoji: string } | null;
+};
+
 const fmt = (n: number) => Math.round(n).toLocaleString("es-AR");
 
 function StatTile({ label, valor, destacado }: { label: string; valor: string; destacado?: boolean }) {
@@ -69,13 +79,40 @@ export function GraficosMes({
   acumuladoEsteMes,
   acumuladoMesAnterior,
   comercios,
+  ultimosGastos,
+  desde,
+  hasta,
 }: {
   kpis: Kpis;
   categorias: CategoriaTotal[];
   acumuladoEsteMes: AcumuladoDia[];
   acumuladoMesAnterior: AcumuladoDia[];
   comercios: Comercio[];
+  ultimosGastos: Gasto[];
+  desde: string;
+  hasta: string;
 }) {
+  const [categoriaAbierta, setCategoriaAbierta] = useState<string | null>(null);
+  const [gastosPorCategoria, setGastosPorCategoria] = useState<Record<string, Gasto[]>>({});
+  const [cargandoCategoria, setCargandoCategoria] = useState<string | null>(null);
+
+  async function toggleCategoria(id: string | null) {
+    if (!id) return;
+    if (categoriaAbierta === id) {
+      setCategoriaAbierta(null);
+      return;
+    }
+    setCategoriaAbierta(id);
+    if (!gastosPorCategoria[id]) {
+      setCargandoCategoria(id);
+      const params = new URLSearchParams({ categoria_id: id, desde, hasta });
+      const res = await fetch(`/api/movimientos?${params.toString()}`);
+      const data = await res.json();
+      setGastosPorCategoria((prev) => ({ ...prev, [id]: data.movimientos ?? [] }));
+      setCargandoCategoria(null);
+    }
+  }
+
   const dataAcumulado = Array.from(
     { length: Math.max(acumuladoEsteMes.length, acumuladoMesAnterior.length) },
     (_, i) => ({
@@ -95,12 +132,13 @@ export function GraficosMes({
 
   const dataDonut = [
     ...top6.map((c, i) => ({
+      id: c.categoria_id,
       nombre: `${c.categoria_emoji} ${c.categoria_nombre}`,
       valor: c.total_ars,
       color: PALETTE_CATEGORICA[i],
     })),
     ...(restoSuma > 0
-      ? [{ nombre: "📦 Otras categorías", valor: restoSuma, color: "#5a5a5a" }]
+      ? [{ id: null, nombre: "📦 Otras categorías", valor: restoSuma, color: "#5a5a5a" }]
       : []),
   ];
 
@@ -187,19 +225,62 @@ export function GraficosMes({
             </ResponsiveContainer>
             <div className="flex flex-col gap-1 mt-2">
               {dataDonut.map((d) => (
-                <div key={d.nombre} className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full inline-block"
-                      style={{ background: d.color }}
-                    />
-                    {d.nombre}
-                  </span>
-                  <span className="tabular-nums text-muted">${fmt(d.valor)}</span>
+                <div key={d.nombre} className="flex flex-col">
+                  <button
+                    onClick={() => toggleCategoria(d.id)}
+                    disabled={!d.id}
+                    className="flex items-center justify-between text-sm py-1 disabled:cursor-default"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full inline-block"
+                        style={{ background: d.color }}
+                      />
+                      {d.nombre}
+                    </span>
+                    <span className="tabular-nums text-muted">${fmt(d.valor)}</span>
+                  </button>
+                  {categoriaAbierta === d.id && d.id && (
+                    <div className="flex flex-col gap-1.5 pl-4.5 pb-2">
+                      {cargandoCategoria === d.id ? (
+                        <p className="text-muted text-xs">Cargando...</p>
+                      ) : (gastosPorCategoria[d.id] ?? []).length === 0 ? (
+                        <p className="text-muted text-xs">Sin gastos.</p>
+                      ) : (
+                        gastosPorCategoria[d.id].map((g) => (
+                          <div key={g.id} className="flex items-center justify-between text-xs">
+                            <span className="truncate text-muted">
+                              {g.descripcion}
+                              {g.comercio ? ` · ${g.comercio}` : ""}
+                            </span>
+                            <span className="tabular-nums shrink-0 ml-2">${fmt(g.monto_ars)}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </>
+        )}
+      </div>
+
+      <div className="card p-4">
+        <h2 className="text-sm text-muted uppercase tracking-wide mb-3">Últimos gastos</h2>
+        {ultimosGastos.length === 0 ? (
+          <p className="text-muted text-sm">Todavía no hay gastos este mes.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {ultimosGastos.map((g) => (
+              <div key={g.id} className="flex items-center justify-between text-sm">
+                <span className="truncate">
+                  {g.categorias?.emoji ?? "📦"} {g.descripcion}
+                </span>
+                <span className="tabular-nums text-muted shrink-0 ml-2">${fmt(g.monto_ars)}</span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

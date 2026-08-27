@@ -1,5 +1,5 @@
 import { crearClienteServidor } from "@/lib/supabase/server";
-import { GraficosMes, type Kpis } from "@/components/GraficosMes";
+import { GraficosMes, type Kpis, type Gasto } from "@/components/GraficosMes";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +29,21 @@ export default async function MesPage() {
   const inicioMesAnterior = primerDiaMes(mesAnterior);
   const finMesAnterior = ultimoDiaMes(mesAnterior);
 
-  const [kpis, categorias, acumuladoEsteMes, acumuladoMesAnterior, comercios] = await Promise.all([
+  const [kpis, categorias, acumuladoEsteMes, acumuladoMesAnterior, comercios, ultimosGastos] = await Promise.all([
     supabase.rpc("kpis_mes", { mes_inicio: inicioMes }).single(),
     supabase.rpc("totales_por_categoria", { desde: inicioMes, hasta: finMes, tipo_filtro: "gasto" }),
     supabase.rpc("gasto_acumulado_diario", { desde: inicioMes, hasta: finMes }),
     supabase.rpc("gasto_acumulado_diario", { desde: inicioMesAnterior, hasta: finMesAnterior }),
     supabase.rpc("top_comercios", { desde: inicioMes, hasta: finMes, limite: 10 }),
+    supabase
+      .from("movimientos")
+      .select("id, descripcion, fecha, monto_ars, comercio, categorias(nombre, emoji)")
+      .eq("tipo", "gasto")
+      .gte("fecha", inicioMes)
+      .lte("fecha", finMes)
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   return (
@@ -45,6 +54,9 @@ export default async function MesPage() {
         acumuladoEsteMes={acumuladoEsteMes.data ?? []}
         acumuladoMesAnterior={acumuladoMesAnterior.data ?? []}
         comercios={comercios.data ?? []}
+        ultimosGastos={(ultimosGastos.data ?? []) as unknown as Gasto[]}
+        desde={inicioMes}
+        hasta={finMes}
       />
     </main>
   );
