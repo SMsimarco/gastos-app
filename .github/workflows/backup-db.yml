@@ -16,15 +16,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Instalar postgresql-client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Instalar postgresql-client 17 (match versión servidor Supabase)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
 
       - name: Dump de la base
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           FECHA=$(date -u +%Y-%m-%d)
-          pg_dump "$DB_URL" --no-owner --no-acl -F c -f "/tmp/backup-$FECHA.dump"
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" --no-owner --no-acl -F c -f "/tmp/backup-$FECHA.dump"
           gzip -9 "/tmp/backup-$FECHA.dump"
           echo "DUMP_FILE=/tmp/backup-$FECHA.dump.gz" >> "$GITHUB_ENV"
 
