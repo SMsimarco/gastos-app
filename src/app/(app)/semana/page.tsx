@@ -1,5 +1,6 @@
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { GraficoSemana } from "@/components/GraficoSemana";
+import type { Gasto } from "@/components/GraficosMes";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export default async function SemanaPage() {
   const domingoAnterior = new Date(lunesAnterior);
   domingoAnterior.setUTCDate(lunesAnterior.getUTCDate() + 6);
 
-  const [estaSemana, semanaAnterior] = await Promise.all([
+  const [estaSemana, semanaAnterior, ultimosGastos] = await Promise.all([
     supabase.rpc("gasto_acumulado_diario", {
       desde: toISO(lunesEsta),
       hasta: toISO(domingoEsta),
@@ -46,6 +47,15 @@ export default async function SemanaPage() {
       desde: toISO(lunesAnterior),
       hasta: toISO(domingoAnterior),
     }),
+    supabase
+      .from("movimientos")
+      .select("id, descripcion, fecha, monto_ars, comercio, categorias(nombre, emoji)")
+      .eq("tipo", "gasto")
+      .gte("fecha", toISO(lunesEsta))
+      .lte("fecha", toISO(domingoEsta))
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   return (
@@ -53,6 +63,7 @@ export default async function SemanaPage() {
       <GraficoSemana
         estaSemana={estaSemana.data ?? []}
         semanaAnterior={semanaAnterior.data ?? []}
+        ultimosGastos={(ultimosGastos.data ?? []) as unknown as Gasto[]}
       />
     </main>
   );

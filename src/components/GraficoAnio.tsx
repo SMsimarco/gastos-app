@@ -16,6 +16,7 @@ import {
   Line,
 } from "recharts";
 import { PALETTE_CATEGORICA, CHART_CHROME } from "@/lib/palette";
+import type { Gasto } from "@/components/GraficosMes";
 
 type ResumenMes = {
   mes: number;
@@ -101,11 +102,13 @@ export function GraficoAnio({
   resumen,
   categoriaMensual,
   diario,
+  ultimosGastos,
 }: {
   anio: number;
   resumen: ResumenMes[];
   categoriaMensual: CategoriaMes[];
   diario: Dia[];
+  ultimosGastos: Gasto[];
 }) {
   const [moneda, setMoneda] = useState<"ARS" | "USD">("ARS");
 
@@ -251,6 +254,24 @@ export function GraficoAnio({
       <div className="card p-4">
         <h2 className="text-sm text-muted uppercase tracking-wide mb-3">Actividad diaria</h2>
         <Heatmap diario={diario} />
+      </div>
+
+      <div className="card p-4">
+        <h2 className="text-sm text-muted uppercase tracking-wide mb-3">Últimos gastos</h2>
+        {ultimosGastos.length === 0 ? (
+          <p className="text-muted text-sm">Todavía no hay gastos este año.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {ultimosGastos.map((g) => (
+              <div key={g.id} className="flex items-center justify-between text-sm">
+                <span className="truncate">
+                  {g.categorias?.emoji ?? "📦"} {g.descripcion}
+                </span>
+                <span className="tabular-nums text-muted shrink-0 ml-2">${fmt(g.monto_ars)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

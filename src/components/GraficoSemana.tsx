@@ -2,6 +2,7 @@
 
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts";
 import { PALETTE_CATEGORICA, CHART_CHROME } from "@/lib/palette";
+import type { Gasto } from "@/components/GraficosMes";
 
 type Dia = { fecha: string; total_dia: number; acumulado: number };
 
@@ -19,9 +20,11 @@ const tooltipStyle = {
 export function GraficoSemana({
   estaSemana,
   semanaAnterior,
+  ultimosGastos,
 }: {
   estaSemana: Dia[];
   semanaAnterior: Dia[];
+  ultimosGastos: Gasto[];
 }) {
   const totalEstaSemana = estaSemana.reduce((acc, d) => acc + d.total_dia, 0);
   const totalSemanaAnterior = semanaAnterior.reduce((acc, d) => acc + d.total_dia, 0);
@@ -74,6 +77,24 @@ export function GraficoSemana({
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        )}
+      </div>
+
+      <div className="card p-4">
+        <h2 className="text-sm text-muted uppercase tracking-wide mb-3">Últimos gastos</h2>
+        {ultimosGastos.length === 0 ? (
+          <p className="text-muted text-sm">Todavía no hay gastos esta semana.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {ultimosGastos.map((g) => (
+              <div key={g.id} className="flex items-center justify-between text-sm">
+                <span className="truncate">
+                  {g.categorias?.emoji ?? "📦"} {g.descripcion}
+                </span>
+                <span className="tabular-nums text-muted shrink-0 ml-2">${fmt(g.monto_ars)}</span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
