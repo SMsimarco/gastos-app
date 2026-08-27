@@ -1,0 +1,57 @@
+name: Backup Supabase DB
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 03:00 Argentina
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Instalar postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Dump de la base
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          FECHA=$(date -u +%Y-%m-%d)
+          pg_dump "$DB_URL" --no-owner --no-acl -F c -f "/tmp/backup-$FECHA.dump"
+          gzip -9 "/tmp/backup-$FECHA.dump"
+          echo "DUMP_FILE=/tmp/backup-$FECHA.dump.gz" >> "$GITHUB_ENV"
+
+      - name: Publicar en rama backups
+        run: |
+          git config user.name "backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          git fetch origin backups:backups 2>/dev/null || true
+          if git show-ref --verify --quiet refs/heads/backups; then
+            git checkout backups
+          else
+            git checkout --orphan backups
+            git rm -rf . > /dev/null 2>&1 || true
+          fi
+          mkdir -p backups
+          cp "$DUMP_FILE" backups/
+
+          # Retención: borrar dumps de más de 30 días (por fecha en el nombre, no mtime)
+          LIMITE=$(date -u -d "-30 days" +%Y-%m-%d)
+          for f in backups/backup-*.dump.gz; do
+            [ -e "$f" ] || continue
+            FECHA_ARCHIVO=$(basename "$f" | sed -E 's/backup-([0-9-]+)\.dump\.gz/\1/')
+            if [[ "$FECHA_ARCHIVO" < "$LIMITE" ]]; then
+              rm "$f"
+            fi
+          done
+
+          git add backups/
+          git commit -m "Backup automático $(date -u +%Y-%m-%d)" || echo "Nada nuevo para commitear"
+          git push origin backups
