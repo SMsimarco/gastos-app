@@ -70,12 +70,8 @@ export async function sincronizarGmailUsuario(
     try {
       const mensaje = await obtenerMensaje(accessToken, id);
       const textoCompleto = `Asunto: ${mensaje.asunto}\n\n${mensaje.texto}`;
-      // eslint-disable-next-line no-console
-      console.log("[gmail-debug] texto:", textoCompleto.slice(0, 800));
 
       const resultado = await clasificarYExtraerTexto(textoCompleto, categorias);
-      // eslint-disable-next-line no-console
-      console.log("[gmail-debug] resultado:", JSON.stringify(resultado).slice(0, 1500));
       const movimientos = resultado.intencion === "registro" ? resultado.movimientos : [];
 
       const guardables = movimientos.filter((m) => m.confianza !== "baja");
