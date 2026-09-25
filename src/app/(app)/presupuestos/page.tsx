@@ -1,6 +1,7 @@
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { GestionPresupuestos, type Presupuesto } from "@/components/GestionPresupuestos";
 import { MisCategorias } from "@/components/MisCategorias";
+import { GestionGmail } from "@/components/GestionGmail";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,9 @@ export default async function PresupuestosPage() {
         gastadoPorCategoria={totales ?? []}
         mes={inicioMes}
       />
+      <div className="w-full max-w-md mx-auto px-5 pb-4">
+        <GestionGmail />
+      </div>
       <MisCategorias categoriasPropias={todasCategorias ?? []} />
     </main>
   );

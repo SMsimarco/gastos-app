@@ -22,6 +22,7 @@ Registro de gastos e ingresos por voz, texto o foto. Le hablás, le escribís, l
 - **Multi-usuario** — cada cuenta ve únicamente sus propios datos (aislamiento a nivel de base de datos, no solo de interfaz).
 - **Plan de ahorro** — cada vez que registrás un cobro (ingreso), la app calcula el reparto entre 4 bolsillos (Gastos, Fondo de emergencia, Fondo depto/VOO, Aprender) con una función determinística en TypeScript, no con el LLM, y te avisa por push. También hay un simulador manual ("¿cuánta plata tenés disponible ahora?") que usa el mismo motor. Vos confirmás manualmente cuando ya hiciste el movimiento real en ARQ (la app no mueve plata, solo calcula y lleva el saldo). La pestaña Plan también incluye los objetivos de ahorro personalizados (ex-"Metas").
 - **PWA instalable con notificaciones push** — funciona como app nativa en el celular, con cola offline (si capturás sin señal, se sube sola cuando vuelve la conexión) y avisos nativos del navegador sin depender de apps de terceros.
+- **Auto-registro por email (opcional)** — conectás tu Gmail una vez (solo lectura) y cada gasto que hagas con Mercado Pago (u otra billetera que configures) se registra solo, leyendo el mail de confirmación con el mismo Gemini que interpreta un mensaje de texto.
 
 ## Stack
 
@@ -77,6 +78,7 @@ supabase/migrations/0006_agregaciones_anuales.sql
 supabase/migrations/0007_push_y_reglas_default.sql
 supabase/migrations/0008_categorias_propias_fotos_metas.sql
 supabase/migrations/0009_plan_ahorro.sql
+supabase/migrations/0010_gmail_integracion.sql
 ```
 
 Verificá: `select count(*) from categorias;` → 17.
@@ -105,11 +107,23 @@ npx web-push generate-vapid-keys
 
 Te da `NEXT_PUBLIC_VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`. `VAPID_SUBJECT_EMAIL` es cualquier email de contacto (requisito del protocolo, no se usa para nada más). Sin esto configurado, la app funciona igual — simplemente no manda avisos.
 
-### 4. Cron (recurrentes + tipo de cambio)
+### 4. Cron (recurrentes + tipo de cambio + Gmail)
 
 `CRON_SECRET` — cualquier string random largo (`openssl rand -hex 24`). Vercel lo manda automáticamente como header `Authorization: Bearer <valor>` en cada invocación programada (ver `vercel.json`); las rutas lo validan y rechazan cualquier otro llamado.
 
-### 5. Variables de entorno
+### 5. Gmail — auto-registro de gastos (opcional)
+
+Lee la casilla del usuario buscando mails de billeteras virtuales (Mercado Pago por default, configurable) y registra el gasto solo, con el mismo pipeline de Gemini que un mensaje de texto. La app **no** mueve plata ni tiene permiso de escritura sobre el mail, solo lectura (`gmail.readonly`), y cada mail leído se etiqueta para no reprocesarlo.
+
+1. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials), en el mismo proyecto que uses para Gemini (o uno nuevo):
+   - Habilitá la **Gmail API** (APIs & Services → Library).
+   - Configurá la pantalla de consentimiento OAuth (External está bien para uso personal; agregate como test user si queda en modo "Testing").
+   - Creá una credencial **OAuth 2.0 Client ID**, tipo "Web application".
+   - En "Authorized redirect URIs" agregá `https://TU-DOMINIO/api/gmail/callback` (prod) y `http://localhost:3000/api/gmail/callback` (local).
+2. Variables: `GOOGLE_GMAIL_CLIENT_ID` y `GOOGLE_GMAIL_CLIENT_SECRET` (los de esa credencial). Sin esto, la app funciona igual — la card de "Auto-registro por email" en Presupuestos muestra error al tocar "Conectar con Gmail" en vez de romper.
+3. Desde la app: Presupuestos → "Conectar con Gmail" → autorizás una vez. El cron diario (`/api/cron/gmail-mp`, 10:30 UTC) revisa la casilla solo; también hay un botón "Revisar ahora" para probarlo al toque.
+
+### 6. Variables de entorno
 
 Copiá `.env.example` a `.env.local`:
 
@@ -122,16 +136,18 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT_EMAIL=
 CRON_SECRET=
+GOOGLE_GMAIL_CLIENT_ID=
+GOOGLE_GMAIL_CLIENT_SECRET=
 ```
 
-### 6. Correr local
+### 7. Correr local
 
 ```bash
 npm install
 npm run dev
 ```
 
-### 7. Deploy en Vercel
+### 8. Deploy en Vercel
 
 ```bash
 vercel link
@@ -148,6 +164,7 @@ vercel --prod
 - **service_role nunca en el cliente.** Cada API route valida la sesión con la anon key primero; recién después usa la service role (que bypassea RLS) para escribir.
 - **Presupuesto se avisa una sola vez por cruce.** El chequeo compara el total antes/después de cada movimiento — solo notifica en la transacción que efectivamente cruza el umbral, no en cada gasto posterior.
 - **Tema claro fijo (blanco/celeste), mobile-first.** Números grandes, tipografía clara, nav inferior fijo para uso con el pulgar.
+- **`gmail_integracion` sin policies para `authenticated`.** El refresh_token de Gmail es más sensible que el resto de los datos del usuario (da acceso de lectura a la casilla completa) — ni el propio dueño puede leer/escribir esa fila desde el cliente, todo pasa por rutas server-side auditadas con `service_role` (ver `SECURITY.md`).
 
 ## Roadmap
 
