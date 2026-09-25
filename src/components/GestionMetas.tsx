@@ -60,9 +60,9 @@ export function GestionMetas({ metasIniciales }: { metasIniciales: Meta[] }) {
   }
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-md mx-auto p-5 pb-12">
-      <div className="pt-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Metas de ahorro</h1>
+    <div className="flex flex-col gap-6 w-full max-w-md mx-auto px-5 pb-12">
+      <div className="border-t border-border-soft pt-5">
+        <h2 className="text-sm text-muted uppercase tracking-wide">Objetivos personalizados</h2>
         <p className="text-muted text-sm mt-1">Ponete un objetivo y anotá lo que vas juntando.</p>
       </div>
 

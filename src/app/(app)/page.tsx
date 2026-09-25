@@ -14,7 +14,7 @@ export default async function Home() {
 
   const inicioMes = `${hoyAR.slice(0, 7)}-01`;
 
-  const [{ data: movimientos }, { data: kpis }, { data: cuotasPendientes }, { data: recurrentes }] =
+  const [{ data: movimientos }, { data: kpis }, { data: cuotasPendientes }, { data: recurrentes }, { data: presupuestos }] =
     await Promise.all([
       supabase
         .from("movimientos")
@@ -33,6 +33,7 @@ export default async function Home() {
         .from("recurrentes")
         .select("id, descripcion, monto, dia_del_mes, ultima_ejecucion")
         .eq("activo", true),
+      supabase.from("presupuestos").select("monto_mensual").eq("mes", inicioMes),
     ]);
 
   const movimientosMapeados = (movimientos ?? []).map((m) => {
@@ -54,7 +55,13 @@ export default async function Home() {
     .filter((m) => m.tipo === "gasto")
     .reduce((acc, m) => acc + m.monto_ars, 0);
 
-  const promedioDiario = (kpis as { promedio_diario: number } | null)?.promedio_diario ?? null;
+  const kpisMes = kpis as { promedio_diario: number; gastado: number } | null;
+  const promedioDiario = kpisMes?.promedio_diario ?? null;
+  const gastadoMes = kpisMes?.gastado ?? 0;
+  const presupuestoTotal =
+    presupuestos && presupuestos.length > 0
+      ? presupuestos.reduce((acc, p) => acc + p.monto_mensual, 0)
+      : null;
 
   const cuotasMapeadas = (cuotasPendientes ?? []).map((c) => {
     const categoria = c.categorias as unknown as { emoji: string; nombre: string } | null;
@@ -91,6 +98,8 @@ export default async function Home() {
         movimientosIniciales={movimientosMapeados}
         totalHoy={totalHoy}
         promedioDiario={promedioDiario}
+        gastadoMes={gastadoMes}
+        presupuestoTotal={presupuestoTotal}
       />
       <PagosPendientes cuotas={cuotasMapeadas} suscripciones={suscripcionesAVencer} />
     </main>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { IconMic, IconStop, IconSend, IconCamera, IconTrash } from "@/components/icons";
+import { AroPresupuesto } from "@/components/AroPresupuesto";
 import { encolarCaptura, obtenerCola, borrarDeCola, itemAFormData } from "@/lib/colaOffline";
 
 type MovimientoFila = {
@@ -64,10 +65,14 @@ export function CapturaMovimientos({
   movimientosIniciales,
   totalHoy,
   promedioDiario,
+  gastadoMes,
+  presupuestoTotal,
 }: {
   movimientosIniciales: MovimientoFila[];
   totalHoy: number;
   promedioDiario: number | null;
+  gastadoMes: number;
+  presupuestoTotal: number | null;
 }) {
   const [movimientos, setMovimientos] = useState(movimientosIniciales);
   const [grabando, setGrabando] = useState(false);
@@ -83,6 +88,10 @@ export function CapturaMovimientos({
   const totalHoyActual = movimientos
     .filter((m) => m.tipo === "gasto")
     .reduce((acc, m) => acc + m.monto_ars, 0);
+
+  // Se reajusta en vivo a medida que registrás/borrás gastos de hoy, sin
+  // re-pedirle al server el total del mes en cada captura.
+  const gastadoMesActual = gastadoMes + (totalHoyActual - totalHoy);
 
   function procesarRespuesta(data: {
     tipo?: string;
@@ -274,9 +283,13 @@ export function CapturaMovimientos({
 
   return (
     <div className="flex flex-col gap-7 w-full max-w-md mx-auto p-5 pb-12">
-      <div className="flex flex-col gap-1.5 pt-3">
+      <div className="pt-3">
+        <AroPresupuesto gastadoMes={gastadoMesActual} presupuestoTotal={presupuestoTotal} />
+      </div>
+
+      <div className="flex flex-col gap-1.5 items-center text-center">
         <span className="text-muted text-xs font-medium uppercase tracking-widest">Gastado hoy</span>
-        <span className="text-5xl font-semibold tabular-nums tracking-tight">${fmt(totalHoyActual)}</span>
+        <span className="text-3xl font-semibold tabular-nums tracking-tight">${fmt(totalHoyActual)}</span>
         {diferenciaPromedio !== null && (
           <span className="text-sm text-muted">
             {diferenciaPromedio > 0 ? "↑" : diferenciaPromedio < 0 ? "↓" : "="}{" "}

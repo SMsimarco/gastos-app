@@ -3,15 +3,11 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { crearClienteBrowser } from "@/lib/supabase/client";
-import { IconMic, IconCalendarWeek, IconChart, IconCalendarYear, IconList, IconLogout, IconTarget, IconFlag, IconWallet } from "@/components/icons";
+import { IconMic, IconChart, IconList, IconLogout, IconWallet } from "@/components/icons";
 
 const TABS = [
   { href: "/", label: "Hoy", Icon: IconMic },
-  { href: "/semana", label: "Semana", Icon: IconCalendarWeek },
-  { href: "/mes", label: "Mes", Icon: IconChart },
-  { href: "/anio", label: "Año", Icon: IconCalendarYear },
-  { href: "/presupuestos", label: "Presupuestos", Icon: IconTarget },
-  { href: "/metas", label: "Metas", Icon: IconFlag },
+  { href: "/resumen", label: "Resumen", Icon: IconChart },
   { href: "/plan", label: "Plan", Icon: IconWallet },
   { href: "/todos", label: "Todos", Icon: IconList },
 ];

@@ -13,13 +13,14 @@ Registro de gastos e ingresos por voz, texto o foto. Le hablás, le escribís, l
 - **Categorización automática** — matchea contra reglas propias del usuario (ej. "Rappi" → siempre Delivery/Restaurantes; cada cuenta nueva arranca con reglas para comercios argentinos comunes) antes de usar el criterio del modelo.
 - **Cuotas** — si mencionás "en 6 cuotas", divide el monto y programa cada cuota en el mes que corresponde automáticamente.
 - **Detección de duplicados** — si registrás dos veces el mismo gasto el mismo día, te avisa (no bloquea, por si realmente compraste dos veces).
-- **Presupuestos con alertas** — configurás un tope mensual por categoría y te avisa apenas lo cruzás.
+- **Presupuestos con alertas** — configurás un tope mensual por categoría y te avisa apenas lo cruzás. Se accede tocando el aro de presupuesto de la pantalla Hoy.
 - **Confianza baja = no inventa** — si no puede determinar el monto con seguridad, pide aclaración en vez de adivinar.
-- **Dashboards** — vistas de Hoy, Semana, Mes y Año con KPIs, gasto acumulado vs. período anterior, distribución por categoría, top comercios y un heatmap de actividad anual estilo GitHub.
+- **Aro de presupuesto** — en Hoy, un aro circular muestra cuánto te queda del presupuesto mensual y se va vaciando a medida que gastás (se pone rojo si te pasás). Sin presupuesto configurado, invita a crear uno.
+- **Dashboards** — un selector Semana/Mes/Año (pestaña "Resumen") con KPIs, gasto acumulado vs. período anterior, distribución por categoría, top comercios, heatmap de actividad anual estilo GitHub y buscador de gastos puntuales por nombre/comercio/categoría.
 - **Tabla completa** — todos los movimientos, filtrables por fecha/categoría/método de pago/comercio/monto, con edición inline, borrado y exportación a CSV.
 - **Recurrentes y dólar automáticos** — un cron diario carga los gastos fijos (alquiler, servicios) y actualiza la cotización del dólar sin intervención manual.
 - **Multi-usuario** — cada cuenta ve únicamente sus propios datos (aislamiento a nivel de base de datos, no solo de interfaz).
-- **Plan de ahorro** — cada vez que registrás un cobro (ingreso), la app calcula el reparto entre 4 bolsillos (Gastos, Fondo de emergencia, Fondo depto/VOO, Aprender) con una función determinística en TypeScript, no con el LLM, y te avisa por push. Vos confirmás manualmente cuando ya hiciste el movimiento real en ARQ (la app no mueve plata, solo calcula y lleva el saldo).
+- **Plan de ahorro** — cada vez que registrás un cobro (ingreso), la app calcula el reparto entre 4 bolsillos (Gastos, Fondo de emergencia, Fondo depto/VOO, Aprender) con una función determinística en TypeScript, no con el LLM, y te avisa por push. También hay un simulador manual ("¿cuánta plata tenés disponible ahora?") que usa el mismo motor. Vos confirmás manualmente cuando ya hiciste el movimiento real en ARQ (la app no mueve plata, solo calcula y lleva el saldo). La pestaña Plan también incluye los objetivos de ahorro personalizados (ex-"Metas").
 - **PWA instalable con notificaciones push** — funciona como app nativa en el celular, con cola offline (si capturás sin señal, se sube sola cuando vuelve la conexión) y avisos nativos del navegador sin depender de apps de terceros.
 
 ## Stack
@@ -48,7 +49,7 @@ Usuario (audio / texto / foto / pregunta)
         │                          ▼
         │                    Supabase (Postgres + RLS por usuario)
         │                          │
-        └──────────────────────────┴──► Dashboards (Hoy / Semana / Mes / Año / Todos / Presupuestos)
+        └──────────────────────────┴──► Hoy / Resumen (Semana·Mes·Año) / Plan / Todos / Presupuestos
                                     │
                                     ▼
                          Web Push (confirmación, presupuesto excedido, recurrentes)
