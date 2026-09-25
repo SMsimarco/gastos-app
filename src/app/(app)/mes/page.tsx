@@ -42,8 +42,7 @@ export default async function MesPage() {
       .gte("fecha", inicioMes)
       .lte("fecha", finMes)
       .order("fecha", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(8),
+      .order("created_at", { ascending: false }),
   ]);
 
   return (

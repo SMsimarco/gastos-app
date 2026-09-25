@@ -114,7 +114,7 @@ export function GestionMetas({ metasIniciales }: { metasIniciales: Meta[] }) {
               <div className="h-2 rounded-full bg-surface-2 overflow-hidden">
                 <div
                   className="h-full rounded-full transition-[width]"
-                  style={{ width: `${pct}%`, background: completa ? "#34d399" : "#3987e5" }}
+                  style={{ width: `${pct}%`, background: completa ? "var(--positive)" : "var(--accent)" }}
                 />
               </div>
               {!completa && (

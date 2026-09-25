@@ -75,6 +75,7 @@ export function CapturaMovimientos({
   const [texto, setTexto] = useState("");
   const [mensaje, setMensaje] = useState<{ texto: string; tipo: "ok" | "warn" } | null>(null);
   const [pendientesOffline, setPendientesOffline] = useState(0);
+  const [busqueda, setBusqueda] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -299,8 +300,8 @@ export function CapturaMovimientos({
           }`}
           style={{
             boxShadow: grabando
-              ? "0 0 0 1px rgba(248,113,113,0.3), 0 12px 32px -8px rgba(248,113,113,0.45)"
-              : "0 0 0 1px rgba(52,211,153,0.3), 0 12px 32px -8px rgba(52,211,153,0.45)",
+              ? "0 0 0 1px rgba(220,38,38,0.3), 0 12px 32px -8px rgba(220,38,38,0.45)"
+              : "0 0 0 1px rgba(14,165,233,0.3), 0 12px 32px -8px rgba(14,165,233,0.45)",
           }}
         >
           {grabando && (
@@ -349,7 +350,17 @@ export function CapturaMovimientos({
         {movimientos.length === 0 && (
           <p className="text-muted text-sm py-2">Todavía no registraste nada hoy.</p>
         )}
-        {movimientos.map((m) => (
+        {movimientos.length > 5 && (
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar en lo de hoy..."
+            className="bg-surface border border-border-soft rounded-xl px-3 py-2 text-sm outline-none focus:border-accent"
+          />
+        )}
+        {movimientos
+          .filter((m) => !busqueda.trim() || m.descripcion?.toLowerCase().includes(busqueda.toLowerCase()))
+          .map((m) => (
           <div
             key={m.id}
             className="card flex items-center justify-between px-4 py-3.5"
@@ -366,7 +377,7 @@ export function CapturaMovimientos({
             <div className="flex items-center gap-3 shrink-0">
               <span
                 className="text-lg font-semibold tabular-nums"
-                style={{ color: m.tipo === "gasto" ? "#f87171" : "#34d399" }}
+                style={{ color: m.tipo === "gasto" ? "var(--danger)" : "var(--positive)" }}
               >
                 {m.tipo === "gasto" ? "-" : "+"}${fmt(m.monto_ars)}
               </span>

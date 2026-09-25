@@ -54,8 +54,7 @@ export default async function SemanaPage() {
       .gte("fecha", toISO(lunesEsta))
       .lte("fecha", toISO(domingoEsta))
       .order("fecha", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(8),
+      .order("created_at", { ascending: false }),
   ]);
 
   return (

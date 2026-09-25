@@ -1,5 +1,5 @@
 import { crearClienteServidor } from "@/lib/supabase/server";
-import { obtenerConfigPlan, obtenerGastoMensualArs, obtenerUltimoMep } from "@/lib/planData";
+import { obtenerConfigPlan, obtenerGastoMensualConFuente, obtenerUltimoMep } from "@/lib/planData";
 import { GestionPlan } from "@/components/GestionPlan";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +10,10 @@ export default async function PlanPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: bolsillos }, config, gastoMensualArs, mepReferencia, { data: repartoPendiente }] = await Promise.all([
+  const [{ data: bolsillos }, config, gastoMensual, mepReferencia, { data: repartoPendiente }] = await Promise.all([
     supabase.from("bolsillos").select("id, clave, nombre, moneda, saldo, meta, orden").order("orden"),
     user ? obtenerConfigPlan(supabase, user.id) : Promise.resolve(null),
-    user ? obtenerGastoMensualArs(supabase, user.id) : Promise.resolve(null),
+    user ? obtenerGastoMensualConFuente(supabase, user.id) : Promise.resolve({ valor: null, fuente: "manual" as const }),
     obtenerUltimoMep(supabase),
     supabase
       .from("repartos")
@@ -29,7 +29,8 @@ export default async function PlanPage() {
       <GestionPlan
         bolsillosIniciales={bolsillos ?? []}
         configInicial={config}
-        gastoMensualArsInicial={gastoMensualArs}
+        gastoMensualArsInicial={gastoMensual.valor}
+        gastoMensualFuenteInicial={gastoMensual.fuente}
         mepReferenciaInicial={mepReferencia}
         repartoPendienteInicial={repartoPendiente ?? null}
       />

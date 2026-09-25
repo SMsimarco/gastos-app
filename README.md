@@ -146,7 +146,7 @@ vercel --prod
 - **Reglas de comercio antes que IA.** Si un comercio ya tiene una regla propia (`reglas_comercio`), esa categoría gana sobre lo que sugiere el modelo — determinismo por sobre inferencia cuando el usuario ya dio la respuesta correcta una vez.
 - **service_role nunca en el cliente.** Cada API route valida la sesión con la anon key primero; recién después usa la service role (que bypassea RLS) para escribir.
 - **Presupuesto se avisa una sola vez por cruce.** El chequeo compara el total antes/después de cada movimiento — solo notifica en la transacción que efectivamente cruza el umbral, no en cada gasto posterior.
-- **Tema oscuro fijo, mobile-first.** Sin gradientes ni sombras decorativas — números grandes, tipografía clara.
+- **Tema claro fijo (blanco/celeste), mobile-first.** Números grandes, tipografía clara, nav inferior fijo para uso con el pulgar.
 
 ## Roadmap
 

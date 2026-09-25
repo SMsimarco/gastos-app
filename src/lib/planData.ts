@@ -26,7 +26,14 @@ export async function obtenerConfigPlan(supabase: SupabaseClient, usuarioId: str
   };
 }
 
-export async function obtenerGastoMensualArs(supabase: SupabaseClient, usuarioId: string): Promise<number | null> {
+export type GastoMensual = { valor: number | null; fuente: "calculado" | "manual" };
+
+// "calculado" = promedio real de los últimos 3 meses completos.
+// "manual" = no hay (o no alcanza) datos reales, se usó gasto_mensual_manual.
+export async function obtenerGastoMensualConFuente(
+  supabase: SupabaseClient,
+  usuarioId: string
+): Promise<GastoMensual> {
   const config = await obtenerConfigPlan(supabase, usuarioId);
 
   const hoyISO = new Date().toISOString().slice(0, 10);
@@ -42,8 +49,13 @@ export async function obtenerGastoMensualArs(supabase: SupabaseClient, usuarioId
     .lte("fecha", hoyISO);
 
   const calculado = calcularGastoMensual(movimientos ?? []);
-  if (calculado !== null) return calculado;
-  return config.gasto_mensual_manual ?? null;
+  if (calculado !== null) return { valor: calculado, fuente: "calculado" };
+  return { valor: config.gasto_mensual_manual ?? null, fuente: "manual" };
+}
+
+export async function obtenerGastoMensualArs(supabase: SupabaseClient, usuarioId: string): Promise<number | null> {
+  const { valor } = await obtenerGastoMensualConFuente(supabase, usuarioId);
+  return valor;
 }
 
 export async function obtenerUltimoMep(supabase: SupabaseClient): Promise<number | null> {
@@ -56,15 +68,25 @@ export async function obtenerUltimoMep(supabase: SupabaseClient): Promise<number
   return data && data.length > 0 ? data[0].mep_venta : null;
 }
 
-// Arma y guarda el reparto pendiente para un ingreso recién capturado.
+export type RepartoRow = {
+  id: string;
+  monto_ars: number;
+  tc_referencia: number;
+  detalle: ResultadoReparto;
+  estado: "pendiente" | "aplicado" | "descartado";
+};
+
+// Arma y guarda el reparto pendiente para un monto a repartir: el ingreso
+// recién capturado (ingresoId) o, para el simulador manual de "cuánta plata
+// tengo disponible ahora", sin ingreso asociado (ingresoId = null).
 // Devuelve null si falta algún dato imprescindible (MEP o gasto mensual) —
-// en ese caso no se genera reparto, el ingreso igual queda registrado.
+// en ese caso no se genera reparto (el ingreso, si lo hay, igual queda registrado).
 export async function generarRepartoParaIngreso(
   supabase: SupabaseClient,
   usuarioId: string,
-  ingresoId: string,
+  ingresoId: string | null,
   montoIngresoArs: number
-): Promise<{ id: string; detalle: ResultadoReparto } | null> {
+): Promise<RepartoRow | null> {
   const [config, tcReferencia, gastoMensualArs] = await Promise.all([
     obtenerConfigPlan(supabase, usuarioId),
     obtenerUltimoMep(supabase),
@@ -107,11 +129,11 @@ export async function generarRepartoParaIngreso(
       detalle,
       estado: "pendiente",
     })
-    .select("id")
+    .select("id, monto_ars, tc_referencia, detalle, estado")
     .single();
 
   if (error || !reparto) return null;
-  return { id: reparto.id, detalle };
+  return reparto as RepartoRow;
 }
 
 // Si el ingreso editado/borrado tiene un reparto: lo descarta si estaba

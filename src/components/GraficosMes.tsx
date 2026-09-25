@@ -57,7 +57,7 @@ function StatTile({ label, valor, destacado }: { label: string; valor: string; d
       <span className="text-muted text-xs uppercase tracking-wide">{label}</span>
       <span
         className={`font-semibold tabular-nums ${destacado ? "text-2xl" : "text-lg"}`}
-        style={destacado ? { color: valor.startsWith("-") ? "#e66767" : undefined } : undefined}
+        style={destacado ? { color: valor.startsWith("-") ? "var(--danger)" : undefined } : undefined}
       >
         {valor}
       </span>
@@ -66,11 +66,12 @@ function StatTile({ label, valor, destacado }: { label: string; valor: string; d
 }
 
 const tooltipStyle = {
-  background: "#131415",
-  border: "1px solid #232527",
+  background: "#ffffff",
+  border: "1px solid #d7e6f0",
   borderRadius: 8,
   color: CHART_CHROME.texto,
   fontSize: 13,
+  boxShadow: "0 4px 16px -4px rgba(15, 37, 51, 0.2)",
 };
 
 export function GraficosMes({
@@ -95,6 +96,17 @@ export function GraficosMes({
   const [categoriaAbierta, setCategoriaAbierta] = useState<string | null>(null);
   const [gastosPorCategoria, setGastosPorCategoria] = useState<Record<string, Gasto[]>>({});
   const [cargandoCategoria, setCargandoCategoria] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+
+  const gastosFiltrados = ultimosGastos.filter((g) => {
+    if (!busqueda.trim()) return true;
+    const q = busqueda.toLowerCase();
+    return (
+      g.descripcion?.toLowerCase().includes(q) ||
+      g.comercio?.toLowerCase().includes(q) ||
+      g.categorias?.nombre.toLowerCase().includes(q)
+    );
+  });
 
   async function toggleCategoria(id: string | null) {
     if (!id) return;
@@ -138,7 +150,7 @@ export function GraficosMes({
       color: PALETTE_CATEGORICA[i],
     })),
     ...(restoSuma > 0
-      ? [{ id: null, nombre: "📦 Otras categorías", valor: restoSuma, color: "#5a5a5a" }]
+      ? [{ id: null, nombre: "📦 Otras categorías", valor: restoSuma, color: "#94a3b8" }]
       : []),
   ];
 
@@ -211,7 +223,7 @@ export function GraficosMes({
                   innerRadius={55}
                   outerRadius={90}
                   strokeWidth={2}
-                  stroke="#171717"
+                  stroke="#ffffff"
                 >
                   {dataDonut.map((d) => (
                     <Cell key={d.nombre} fill={d.color} />
@@ -267,20 +279,38 @@ export function GraficosMes({
       </div>
 
       <div className="card p-4">
-        <h2 className="text-sm text-muted uppercase tracking-wide mb-3">Últimos gastos</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm text-muted uppercase tracking-wide">Gastos del mes</h2>
+          <span className="text-xs text-muted tabular-nums">{ultimosGastos.length}</span>
+        </div>
         {ultimosGastos.length === 0 ? (
           <p className="text-muted text-sm">Todavía no hay gastos este mes.</p>
         ) : (
-          <div className="flex flex-col gap-2">
-            {ultimosGastos.map((g) => (
-              <div key={g.id} className="flex items-center justify-between text-sm">
-                <span className="truncate">
-                  {g.categorias?.emoji ?? "📦"} {g.descripcion}
-                </span>
-                <span className="tabular-nums text-muted shrink-0 ml-2">${fmt(g.monto_ars)}</span>
+          <>
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre, comercio o categoría..."
+              className="w-full bg-surface-2 border border-border-soft rounded-xl px-3 py-2 text-sm outline-none focus:border-accent mb-3"
+            />
+            {gastosFiltrados.length === 0 ? (
+              <p className="text-muted text-sm">Ningún gasto coincide con &quot;{busqueda}&quot;.</p>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
+                {gastosFiltrados.map((g) => (
+                  <div key={g.id} className="flex items-center justify-between text-sm">
+                    <span className="min-w-0">
+                      <span className="truncate block">
+                        {g.categorias?.emoji ?? "📦"} {g.descripcion}
+                      </span>
+                      {g.comercio && <span className="text-muted text-xs">{g.comercio} · {g.fecha}</span>}
+                    </span>
+                    <span className="tabular-nums text-muted shrink-0 ml-2">${fmt(g.monto_ars)}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 

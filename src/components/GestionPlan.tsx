@@ -45,12 +45,14 @@ export function GestionPlan({
   bolsillosIniciales,
   configInicial,
   gastoMensualArsInicial,
+  gastoMensualFuenteInicial,
   mepReferenciaInicial,
   repartoPendienteInicial,
 }: {
   bolsillosIniciales: Bolsillo[];
   configInicial: ConfigPlan;
   gastoMensualArsInicial: number | null;
+  gastoMensualFuenteInicial: "calculado" | "manual";
   mepReferenciaInicial: number | null;
   repartoPendienteInicial: RepartoPendiente;
 }) {
@@ -58,12 +60,16 @@ export function GestionPlan({
   const [reparto, setReparto] = useState(repartoPendienteInicial);
   const [config, setConfig] = useState(configInicial);
   const [gastoMensualArs] = useState(gastoMensualArsInicial);
+  const [gastoMensualFuente] = useState(gastoMensualFuenteInicial);
   const [mepReferencia] = useState(mepReferenciaInicial);
   const [procesandoReparto, setProcesandoReparto] = useState(false);
   const [tcUsado, setTcUsado] = useState(reparto ? String(reparto.tc_referencia) : "");
   const [ajustando, setAjustando] = useState<string | null>(null);
   const [valorAjuste, setValorAjuste] = useState<Record<string, string>>({});
   const [guardandoConfig, setGuardandoConfig] = useState(false);
+  const [montoDisponible, setMontoDisponible] = useState("");
+  const [calculandoSimulacion, setCalculandoSimulacion] = useState(false);
+  const [errorSimulacion, setErrorSimulacion] = useState<string | null>(null);
 
   async function aplicarReparto() {
     if (!reparto) return;
@@ -110,6 +116,31 @@ export function GestionPlan({
     setAjustando(null);
   }
 
+  async function calcularRepartoManual(e: React.FormEvent) {
+    e.preventDefault();
+    const monto = Number(montoDisponible);
+    if (!monto || monto <= 0) return;
+    setCalculandoSimulacion(true);
+    setErrorSimulacion(null);
+    try {
+      const res = await fetch("/api/plan/reparto-manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monto }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReparto(data.reparto);
+        setTcUsado(String(data.reparto.tc_referencia));
+        setMontoDisponible("");
+      } else {
+        setErrorSimulacion(data.error ?? "No pude calcular el reparto");
+      }
+    } finally {
+      setCalculandoSimulacion(false);
+    }
+  }
+
   async function guardarConfig(cambios: Partial<NonNullable<ConfigPlan>>) {
     setGuardandoConfig(true);
     try {
@@ -132,10 +163,10 @@ export function GestionPlan({
         <p className="text-muted text-sm mt-1">Cada cobro se reparte solo entre tus bolsillos.</p>
       </div>
 
-      {reparto && (
+      {reparto ? (
         <div className="card p-4 flex flex-col gap-3 border-accent/40">
           <div className="flex items-center justify-between">
-            <span className="font-medium">💰 Cobraste ${fmtArs(reparto.monto_ars)}</span>
+            <span className="font-medium">💰 ${fmtArs(reparto.monto_ars)} para repartir</span>
             <span className="text-xs text-muted">MEP ${reparto.tc_referencia}</span>
           </div>
           <ul className="text-sm text-muted flex flex-col gap-1">
@@ -169,11 +200,39 @@ export function GestionPlan({
             </button>
           </div>
         </div>
+      ) : (
+        <form onSubmit={calcularRepartoManual} className="card p-4 flex flex-col gap-3">
+          <div>
+            <span className="font-medium">¿Cuánta plata tenés disponible ahora?</span>
+            <p className="text-muted text-sm mt-0.5">
+              Metela y te digo cómo repartirla entre tus bolsillos.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={montoDisponible}
+              onChange={(e) => setMontoDisponible(e.target.value)}
+              placeholder="Ej: 600000"
+              className="flex-1 bg-surface-2 border border-border-soft rounded-xl px-3 py-2.5 text-sm outline-none focus:border-accent tabular-nums"
+            />
+            <button
+              type="submit"
+              disabled={calculandoSimulacion || !montoDisponible}
+              className="pressable bg-accent text-black font-medium rounded-xl px-4 py-2.5 text-sm disabled:opacity-50 hover:brightness-110 transition-[filter]"
+            >
+              {calculandoSimulacion ? "Calculando..." : "Repartir"}
+            </button>
+          </div>
+          {errorSimulacion && <p className="text-danger text-sm">{errorSimulacion}</p>}
+        </form>
       )}
 
       <div className="text-sm text-muted flex flex-col gap-0.5">
         <span>
-          Gasto mensual real: {gastoMensualArs !== null ? `$${fmtArs(gastoMensualArs)} (promedio de los últimos 3 meses)` : "sin datos suficientes todavía"}
+          Gasto mensual: {gastoMensualArs !== null
+            ? `$${fmtArs(gastoMensualArs)} ${gastoMensualFuente === "calculado" ? "(promedio de los últimos 3 meses)" : "(cargado a mano en Configuración)"}`
+            : "sin datos suficientes todavía — cargalo a mano en Configuración"}
         </span>
         {config && gastoMensualArs !== null && mepReferencia && (
           <span>
@@ -201,7 +260,7 @@ export function GestionPlan({
                 <div className="h-2 rounded-full bg-surface-2 overflow-hidden">
                   <div
                     className="h-full rounded-full transition-[width]"
-                    style={{ width: `${pct}%`, background: "#3987e5" }}
+                    style={{ width: `${pct}%`, background: "var(--accent)" }}
                   />
                 </div>
               )}

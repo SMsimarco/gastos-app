@@ -138,7 +138,7 @@ export function GestionPresupuestos({
                   className="h-full rounded-full transition-[width]"
                   style={{
                     width: `${pct}%`,
-                    background: excedido ? "#f87171" : "#34d399",
+                    background: excedido ? "var(--danger)" : "var(--positive)",
                   }}
                 />
               </div>

@@ -342,7 +342,7 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
                 <div className="flex items-center gap-2 shrink-0">
                   <span
                     className="text-lg font-semibold tabular-nums"
-                    style={{ color: m.tipo === "gasto" ? "#f87171" : "#34d399" }}
+                    style={{ color: m.tipo === "gasto" ? "var(--danger)" : "var(--positive)" }}
                   >
                     {m.tipo === "gasto" ? "-" : "+"}${fmt(m.monto_ars)}
                   </span>
