@@ -1,11 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  obtenerAccessToken,
-  asegurarEtiquetas,
-  listarMensajesNuevos,
-  obtenerMensaje,
-  etiquetarMensaje,
-} from "./gmail";
+import { obtenerAccessToken, listarMensajesCandidatos, obtenerMensaje } from "./gmail";
 import { clasificarYExtraerTexto } from "./gemini";
 import { obtenerListasCategorias } from "./categorias";
 import { guardarMovimiento } from "./movimientos";
@@ -19,14 +13,16 @@ export type ResultadoSyncUsuario = {
 };
 
 // Procesa los mails nuevos de un usuario y los registra. Usado tanto por el
-// cron diario como por "revisar ahora" en la UI — misma lógica.
+// cron diario como por "revisar ahora" en la UI — misma lógica. Acceso a
+// Gmail 100% lectura (gmail.readonly): "ya lo procesé" se controla contra
+// gmail_mensajes_procesados, no con etiquetas en el mail.
 export async function sincronizarGmailUsuario(
   supabaseServicio: SupabaseClient,
   usuarioId: string
 ): Promise<ResultadoSyncUsuario> {
   const { data: integracion } = await supabaseServicio
     .from("gmail_integracion")
-    .select("refresh_token, remitentes, activo, label_procesado_id, label_omitido_id")
+    .select("refresh_token, remitentes, activo")
     .eq("usuario_id", usuarioId)
     .single();
 
@@ -50,23 +46,18 @@ export async function sincronizarGmailUsuario(
     return { registrados: 0, omitidos: 0, errores: 0, desconectado: true };
   }
 
-  const etiquetas = await asegurarEtiquetas(accessToken, {
-    procesado: integracion.label_procesado_id,
-    omitido: integracion.label_omitido_id,
-  });
-  if (etiquetas.procesado !== integracion.label_procesado_id || etiquetas.omitido !== integracion.label_omitido_id) {
-    await supabaseServicio
-      .from("gmail_integracion")
-      .update({ label_procesado_id: etiquetas.procesado, label_omitido_id: etiquetas.omitido })
-      .eq("usuario_id", usuarioId);
+  const candidatos = await listarMensajesCandidatos(accessToken, integracion.remitentes);
+  if (candidatos.length === 0) {
+    return { registrados: 0, omitidos: 0, errores: 0, desconectado: false };
   }
 
-  const idsMensajes = await listarMensajesNuevos(
-    accessToken,
-    integracion.remitentes,
-    etiquetas.procesado,
-    etiquetas.omitido
-  );
+  const { data: yaVistos } = await supabaseServicio
+    .from("gmail_mensajes_procesados")
+    .select("mensaje_id")
+    .eq("usuario_id", usuarioId)
+    .in("mensaje_id", candidatos);
+  const idsVistos = new Set((yaVistos ?? []).map((v) => v.mensaje_id));
+  const idsNuevos = candidatos.filter((id) => !idsVistos.has(id));
 
   const categorias = await obtenerListasCategorias(supabaseServicio, usuarioId);
 
@@ -75,7 +66,7 @@ export async function sincronizarGmailUsuario(
   let errores = 0;
   const resumenPush: string[] = [];
 
-  for (const id of idsMensajes) {
+  for (const id of idsNuevos) {
     try {
       const mensaje = await obtenerMensaje(accessToken, id);
       const textoCompleto = `Asunto: ${mensaje.asunto}\n\n${mensaje.texto}`;
@@ -86,7 +77,9 @@ export async function sincronizarGmailUsuario(
       const guardables = movimientos.filter((m) => m.confianza !== "baja");
 
       if (guardables.length === 0) {
-        await etiquetarMensaje(accessToken, id, etiquetas.omitido);
+        await supabaseServicio
+          .from("gmail_mensajes_procesados")
+          .insert({ usuario_id: usuarioId, mensaje_id: id, estado: "omitido" });
         omitidos++;
         continue;
       }
@@ -101,10 +94,12 @@ export async function sincronizarGmailUsuario(
         );
       }
 
-      await etiquetarMensaje(accessToken, id, etiquetas.procesado);
+      await supabaseServicio
+        .from("gmail_mensajes_procesados")
+        .insert({ usuario_id: usuarioId, mensaje_id: id, estado: "procesado" });
     } catch {
-      // Un mail con error no bloquea el resto; se reintenta la próxima corrida
-      // (no lo etiquetamos, así vuelve a aparecer en la búsqueda).
+      // Un mail con error no bloquea el resto; al no quedar marcado se
+      // reintenta la próxima corrida.
       errores++;
     }
   }

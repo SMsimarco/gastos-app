@@ -85,46 +85,16 @@ async function gmailFetch(accessToken: string, path: string, init?: RequestInit)
   return res.json();
 }
 
-// Busca o crea las dos etiquetas que usamos para no reprocesar mensajes.
-export async function asegurarEtiquetas(
-  accessToken: string,
-  existentes: { procesado: string | null; omitido: string | null }
-): Promise<{ procesado: string; omitido: string }> {
-  if (existentes.procesado && existentes.omitido) {
-    return { procesado: existentes.procesado, omitido: existentes.omitido };
-  }
-
-  const { labels } = await gmailFetch(accessToken, "/labels");
-  const buscar = (nombre: string) => (labels ?? []).find((l: { name: string }) => l.name === nombre)?.id as
-    | string
-    | undefined;
-
-  async function crear(nombre: string): Promise<string> {
-    const existente = buscar(nombre);
-    if (existente) return existente;
-    const creada = await gmailFetch(accessToken, "/labels", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: nombre, labelListVisibility: "labelHide", messageListVisibility: "hide" }),
-    });
-    return creada.id;
-  }
-
-  const procesado = existentes.procesado ?? (await crear("gastos-voz/procesado"));
-  const omitido = existentes.omitido ?? (await crear("gastos-voz/omitido"));
-  return { procesado, omitido };
-}
-
 export type MensajeGmail = { id: string; asunto: string; texto: string; fecha: string };
 
-export async function listarMensajesNuevos(
-  accessToken: string,
-  remitentes: string[],
-  labelProcesadoId: string,
-  labelOmitidoId: string
-): Promise<string[]> {
+// Devuelve candidatos de los últimos 7 días que matchean los remitentes.
+// El filtro de "ya lo procesé" NO es una etiqueta de Gmail (eso pedía
+// gmail.modify/gmail.labels, un permiso de más) — se hace en gmailSync.ts
+// contra nuestra propia tabla gmail_mensajes_procesados. gmail.readonly
+// alcanza para todo esto.
+export async function listarMensajesCandidatos(accessToken: string, remitentes: string[]): Promise<string[]> {
   const remitentesQuery = remitentes.map((r) => `from:${r}`).join(" OR ");
-  const q = `(${remitentesQuery}) newer_than:7d -label:${labelProcesadoId} -label:${labelOmitidoId}`;
+  const q = `(${remitentesQuery}) newer_than:7d`;
   const data = await gmailFetch(accessToken, `/messages?q=${encodeURIComponent(q)}&maxResults=25`);
   return (data.messages ?? []).map((m: { id: string }) => m.id);
 }
@@ -177,12 +147,4 @@ export async function obtenerMensaje(accessToken: string, id: string): Promise<M
   const texto = (plano ?? (html ? stripHtml(html) : data.snippet ?? "")).slice(0, 4000);
 
   return { id, asunto, texto, fecha: data.internalDate };
-}
-
-export async function etiquetarMensaje(accessToken: string, id: string, labelId: string): Promise<void> {
-  await gmailFetch(accessToken, `/messages/${id}/modify`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ addLabelIds: [labelId] }),
-  });
 }
