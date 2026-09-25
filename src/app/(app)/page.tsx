@@ -14,27 +14,34 @@ export default async function Home() {
 
   const inicioMes = `${hoyAR.slice(0, 7)}-01`;
 
-  const [{ data: movimientos }, { data: kpis }, { data: cuotasPendientes }, { data: recurrentes }, { data: presupuestos }] =
-    await Promise.all([
-      supabase
-        .from("movimientos")
-        .select("id, tipo, monto_ars, descripcion, fecha, cuotas_total, cuota_nro, categorias(emoji, nombre)")
-        .eq("fecha", hoyAR)
-        .order("created_at", { ascending: false }),
-      supabase.rpc("kpis_mes", { mes_inicio: inicioMes }).single(),
-      supabase
-        .from("movimientos")
-        .select("id, descripcion, fecha, monto_ars, cuota_nro, cuotas_total, categorias(emoji, nombre)")
-        .eq("tipo", "gasto")
-        .gt("fecha", hoyAR)
-        .gt("cuotas_total", 1)
-        .order("fecha", { ascending: true }),
-      supabase
-        .from("recurrentes")
-        .select("id, descripcion, monto, dia_del_mes, ultima_ejecucion")
-        .eq("activo", true),
-      supabase.from("presupuestos").select("monto_mensual").eq("mes", inicioMes),
-    ]);
+  const [
+    { data: movimientos },
+    { data: kpis },
+    { data: cuotasPendientes },
+    { data: recurrentes },
+    { data: presupuestos },
+    { data: presupuestoGeneral },
+  ] = await Promise.all([
+    supabase
+      .from("movimientos")
+      .select("id, tipo, monto_ars, descripcion, fecha, cuotas_total, cuota_nro, categorias(emoji, nombre)")
+      .eq("fecha", hoyAR)
+      .order("created_at", { ascending: false }),
+    supabase.rpc("kpis_mes", { mes_inicio: inicioMes }).single(),
+    supabase
+      .from("movimientos")
+      .select("id, descripcion, fecha, monto_ars, cuota_nro, cuotas_total, categorias(emoji, nombre)")
+      .eq("tipo", "gasto")
+      .gt("fecha", hoyAR)
+      .gt("cuotas_total", 1)
+      .order("fecha", { ascending: true }),
+    supabase
+      .from("recurrentes")
+      .select("id, descripcion, monto, dia_del_mes, ultima_ejecucion")
+      .eq("activo", true),
+    supabase.from("presupuestos").select("monto_mensual").eq("mes", inicioMes),
+    supabase.from("presupuesto_general").select("monto").maybeSingle(),
+  ]);
 
   const movimientosMapeados = (movimientos ?? []).map((m) => {
     const categoria = m.categorias as unknown as { emoji: string; nombre: string } | null;
@@ -58,10 +65,14 @@ export default async function Home() {
   const kpisMes = kpis as { promedio_diario: number; gastado: number } | null;
   const promedioDiario = kpisMes?.promedio_diario ?? null;
   const gastadoMes = kpisMes?.gastado ?? 0;
+  // El presupuesto general (un solo monto, sin categoría) manda si está
+  // cargado; si no, se usa la suma de los presupuestos por categoría
+  // (avanzado/opcional) como respaldo.
   const presupuestoTotal =
-    presupuestos && presupuestos.length > 0
+    presupuestoGeneral?.monto ??
+    (presupuestos && presupuestos.length > 0
       ? presupuestos.reduce((acc, p) => acc + p.monto_mensual, 0)
-      : null;
+      : null);
 
   const cuotasMapeadas = (cuotasPendientes ?? []).map((c) => {
     const categoria = c.categorias as unknown as { emoji: string; nombre: string } | null;

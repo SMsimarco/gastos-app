@@ -70,12 +70,7 @@ export function GestionPresupuestos({
   }
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-md mx-auto p-5 pb-12">
-      <div className="pt-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Presupuestos</h1>
-        <p className="text-muted text-sm mt-1">Te avisamos cuando te pasás de lo planeado este mes.</p>
-      </div>
-
+    <div className="flex flex-col gap-6 w-full max-w-md mx-auto px-5 pb-12">
       <form onSubmit={agregar} className="card p-4 flex flex-col gap-3">
         <select
           value={categoriaId}
