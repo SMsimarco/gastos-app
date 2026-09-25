@@ -19,6 +19,7 @@ Registro de gastos e ingresos por voz, texto o foto. Le hablás, le escribís, l
 - **Tabla completa** — todos los movimientos, filtrables por fecha/categoría/método de pago/comercio/monto, con edición inline, borrado y exportación a CSV.
 - **Recurrentes y dólar automáticos** — un cron diario carga los gastos fijos (alquiler, servicios) y actualiza la cotización del dólar sin intervención manual.
 - **Multi-usuario** — cada cuenta ve únicamente sus propios datos (aislamiento a nivel de base de datos, no solo de interfaz).
+- **Plan de ahorro** — cada vez que registrás un cobro (ingreso), la app calcula el reparto entre 4 bolsillos (Gastos, Fondo de emergencia, Fondo depto/VOO, Aprender) con una función determinística en TypeScript, no con el LLM, y te avisa por push. Vos confirmás manualmente cuando ya hiciste el movimiento real en ARQ (la app no mueve plata, solo calcula y lleva el saldo).
 - **PWA instalable con notificaciones push** — funciona como app nativa en el celular, con cola offline (si capturás sin señal, se sube sola cuando vuelve la conexión) y avisos nativos del navegador sin depender de apps de terceros.
 
 ## Stack
@@ -73,6 +74,8 @@ supabase/migrations/0004_categoria_alimentos.sql
 supabase/migrations/0005_multi_tenant.sql
 supabase/migrations/0006_agregaciones_anuales.sql
 supabase/migrations/0007_push_y_reglas_default.sql
+supabase/migrations/0008_categorias_propias_fotos_metas.sql
+supabase/migrations/0009_plan_ahorro.sql
 ```
 
 Verificá: `select count(*) from categorias;` → 17.

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor, crearClienteServicio } from "@/lib/supabase/server";
+import { manejarRepartoDeIngresoEditado } from "@/lib/planData";
 
 const CAMPOS_EDITABLES = ["monto_ars", "categoria_id", "descripcion", "comercio", "metodo_pago", "fecha"] as const;
 
@@ -57,7 +58,9 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ movimiento: data });
+  const { avisoRepartoAplicado } = await manejarRepartoDeIngresoEditado(supabaseServicio, id);
+
+  return NextResponse.json({ movimiento: data, avisoRepartoAplicado });
 }
 
 export async function DELETE(
@@ -74,6 +77,9 @@ export async function DELETE(
 
   const { id } = await params;
   const supabaseServicio = crearClienteServicio();
+
+  const { avisoRepartoAplicado } = await manejarRepartoDeIngresoEditado(supabaseServicio, id);
+
   const { error } = await supabaseServicio
     .from("movimientos")
     .delete()
@@ -84,5 +90,5 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, avisoRepartoAplicado });
 }
