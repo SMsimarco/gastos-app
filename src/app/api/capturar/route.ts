@@ -7,6 +7,7 @@ import { responderConsulta } from "@/lib/consultas";
 import { enviarPush } from "@/lib/push";
 import { obtenerListasCategorias } from "@/lib/categorias";
 import { subirFotoTicket } from "@/lib/storage";
+import { generarRepartoParaIngreso, resumenRepartoTexto } from "@/lib/planData";
 
 export async function POST(request: NextRequest) {
   const supabaseAuth = await crearClienteServidor();
@@ -100,6 +101,21 @@ export async function POST(request: NextRequest) {
           await enviarPush(supabaseServicio, user.id, {
             title: "Te pasaste del presupuesto",
             body: `${excedido.categoriaNombre}: $${Math.round(excedido.gastado).toLocaleString("es-AR")} de $${Math.round(excedido.presupuesto).toLocaleString("es-AR")} este mes.`,
+          });
+        }
+      }
+
+      if (guardado.tipo === "ingreso") {
+        const reparto = await generarRepartoParaIngreso(
+          supabaseServicio,
+          user.id,
+          guardado.id,
+          guardado.monto_ars
+        );
+        if (reparto) {
+          await enviarPush(supabaseServicio, user.id, {
+            title: `Cobraste $${Math.round(guardado.monto_ars).toLocaleString("es-AR")}`,
+            body: resumenRepartoTexto(reparto.detalle),
           });
         }
       }

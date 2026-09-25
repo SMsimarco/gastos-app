@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { IconMic, IconStop, IconSend, IconCamera, IconTrash } from "@/components/icons";
+import { AroPresupuesto } from "@/components/AroPresupuesto";
 import { encolarCaptura, obtenerCola, borrarDeCola, itemAFormData } from "@/lib/colaOffline";
 
 type MovimientoFila = {
@@ -64,10 +65,14 @@ export function CapturaMovimientos({
   movimientosIniciales,
   totalHoy,
   promedioDiario,
+  gastadoMes,
+  presupuestoTotal,
 }: {
   movimientosIniciales: MovimientoFila[];
   totalHoy: number;
   promedioDiario: number | null;
+  gastadoMes: number;
+  presupuestoTotal: number | null;
 }) {
   const [movimientos, setMovimientos] = useState(movimientosIniciales);
   const [grabando, setGrabando] = useState(false);
@@ -75,6 +80,7 @@ export function CapturaMovimientos({
   const [texto, setTexto] = useState("");
   const [mensaje, setMensaje] = useState<{ texto: string; tipo: "ok" | "warn" } | null>(null);
   const [pendientesOffline, setPendientesOffline] = useState(0);
+  const [busqueda, setBusqueda] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -82,6 +88,10 @@ export function CapturaMovimientos({
   const totalHoyActual = movimientos
     .filter((m) => m.tipo === "gasto")
     .reduce((acc, m) => acc + m.monto_ars, 0);
+
+  // Se reajusta en vivo a medida que registrás/borrás gastos de hoy, sin
+  // re-pedirle al server el total del mes en cada captura.
+  const gastadoMesActual = gastadoMes + (totalHoyActual - totalHoy);
 
   function procesarRespuesta(data: {
     tipo?: string;
@@ -273,9 +283,13 @@ export function CapturaMovimientos({
 
   return (
     <div className="flex flex-col gap-7 w-full max-w-md mx-auto p-5 pb-12">
-      <div className="flex flex-col gap-1.5 pt-3">
+      <div className="pt-3">
+        <AroPresupuesto gastadoMes={gastadoMesActual} presupuestoTotal={presupuestoTotal} />
+      </div>
+
+      <div className="flex flex-col gap-1.5 items-center text-center">
         <span className="text-muted text-xs font-medium uppercase tracking-widest">Gastado hoy</span>
-        <span className="text-5xl font-semibold tabular-nums tracking-tight">${fmt(totalHoyActual)}</span>
+        <span className="text-3xl font-semibold tabular-nums tracking-tight">${fmt(totalHoyActual)}</span>
         {diferenciaPromedio !== null && (
           <span className="text-sm text-muted">
             {diferenciaPromedio > 0 ? "↑" : diferenciaPromedio < 0 ? "↓" : "="}{" "}
@@ -299,8 +313,8 @@ export function CapturaMovimientos({
           }`}
           style={{
             boxShadow: grabando
-              ? "0 0 0 1px rgba(248,113,113,0.3), 0 12px 32px -8px rgba(248,113,113,0.45)"
-              : "0 0 0 1px rgba(52,211,153,0.3), 0 12px 32px -8px rgba(52,211,153,0.45)",
+              ? "0 0 0 1px rgba(220,38,38,0.3), 0 12px 32px -8px rgba(220,38,38,0.45)"
+              : "0 0 0 1px rgba(14,165,233,0.3), 0 12px 32px -8px rgba(14,165,233,0.45)",
           }}
         >
           {grabando && (
@@ -349,7 +363,17 @@ export function CapturaMovimientos({
         {movimientos.length === 0 && (
           <p className="text-muted text-sm py-2">Todavía no registraste nada hoy.</p>
         )}
-        {movimientos.map((m) => (
+        {movimientos.length > 5 && (
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar en lo de hoy..."
+            className="bg-surface border border-border-soft rounded-xl px-3 py-2 text-sm outline-none focus:border-accent"
+          />
+        )}
+        {movimientos
+          .filter((m) => !busqueda.trim() || m.descripcion?.toLowerCase().includes(busqueda.toLowerCase()))
+          .map((m) => (
           <div
             key={m.id}
             className="card flex items-center justify-between px-4 py-3.5"
@@ -366,7 +390,7 @@ export function CapturaMovimientos({
             <div className="flex items-center gap-3 shrink-0">
               <span
                 className="text-lg font-semibold tabular-nums"
-                style={{ color: m.tipo === "gasto" ? "#f87171" : "#34d399" }}
+                style={{ color: m.tipo === "gasto" ? "var(--danger)" : "var(--positive)" }}
               >
                 {m.tipo === "gasto" ? "-" : "+"}${fmt(m.monto_ars)}
               </span>

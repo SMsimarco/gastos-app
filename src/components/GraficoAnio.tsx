@@ -34,11 +34,12 @@ const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "O
 const fmt = (n: number) => Math.round(n).toLocaleString("es-AR");
 
 const tooltipStyle = {
-  background: "#131415",
-  border: "1px solid #232527",
+  background: "#ffffff",
+  border: "1px solid #d7e6f0",
   borderRadius: 8,
   color: CHART_CHROME.texto,
   fontSize: 13,
+  boxShadow: "0 4px 16px -4px rgba(15, 37, 51, 0.2)",
 };
 
 function Heatmap({ diario }: { diario: Dia[] }) {
@@ -56,7 +57,7 @@ function Heatmap({ diario }: { diario: Dia[] }) {
     if (r < 0.75) return 3;
     return 4;
   };
-  const colores = ["#262626", "#1c5cab33", "#1c5cab88", "#2a78d6", "#3987e5"];
+  const colores = ["#e3eef5", "#1c5cab33", "#1c5cab88", "#2a78d6", "#3987e5"];
 
   const celdas = [
     ...Array.from({ length: diaSemanaPrimero }, () => null),
@@ -240,8 +241,8 @@ export function GraficoAnio({
                     type="monotone"
                     dataKey={cat}
                     stackId="1"
-                    stroke={cat === "Otras" ? "#5a5a5a" : PALETTE_CATEGORICA[i]}
-                    fill={cat === "Otras" ? "#5a5a5a" : PALETTE_CATEGORICA[i]}
+                    stroke={cat === "Otras" ? "#94a3b8" : PALETTE_CATEGORICA[i]}
+                    fill={cat === "Otras" ? "#94a3b8" : PALETTE_CATEGORICA[i]}
                     fillOpacity={0.5}
                   />
                 ))}

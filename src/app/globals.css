@@ -1,16 +1,18 @@
 @import "tailwindcss";
 
+/* Tema claro fijo (blanco / celeste), mobile-first. Ver README > Decisiones de diseño. */
 :root {
-  --background: #08090a;
-  --surface: #131415;
-  --surface-2: #1a1c1e;
-  --border: #232527;
-  --border-soft: #1d1f21;
-  --foreground: #f3f4f5;
-  --muted: #8b8f94;
-  --accent: #34d399;
-  --accent-soft: #34d39926;
-  --danger: #f87171;
+  --background: #eef5fa;
+  --surface: #ffffff;
+  --surface-2: #eaf3f9;
+  --border: #d7e6f0;
+  --border-soft: #e3eef5;
+  --foreground: #0f2533;
+  --muted: #5c7686;
+  --accent: #0ea5e9;
+  --accent-soft: #0ea5e91f;
+  --positive: #16a34a;
+  --danger: #dc2626;
 }
 
 @theme inline {
@@ -22,6 +24,7 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-positive: var(--positive);
   --color-danger: var(--danger);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -29,7 +32,7 @@
 
 body {
   background:
-    radial-gradient(ellipse 900px 500px at 50% -10%, #1a2e2380, transparent),
+    radial-gradient(ellipse 900px 500px at 50% -10%, #bfe3f680, transparent),
     var(--background);
   color: var(--foreground);
   min-height: 100vh;
@@ -44,7 +47,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border-soft);
   border-radius: 1rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 2px rgba(15, 37, 51, 0.06), 0 8px 24px -12px rgba(15, 37, 51, 0.14);
 }
 
 .pressable {

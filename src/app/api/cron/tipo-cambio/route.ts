@@ -9,14 +9,18 @@ export async function GET(request: NextRequest) {
 
   let blueVenta: number;
   let oficialVenta: number;
+  let mepVenta: number | null;
   try {
     const res = await fetch("https://dolarapi.com/v1/dolares", { cache: "no-store" });
     const data: Array<{ casa: string; venta: number }> = await res.json();
     const blue = data.find((d) => d.casa === "blue");
     const oficial = data.find((d) => d.casa === "oficial");
+    // MEP: dolarapi lo devuelve bajo casa "bolsa" (verificado contra la API real).
+    const mep = data.find((d) => d.casa === "bolsa");
     if (!blue || !oficial) throw new Error("dolarapi no devolvió blue/oficial");
     blueVenta = blue.venta;
     oficialVenta = oficial.venta;
+    mepVenta = mep ? mep.venta : null; // si no viene, seguimos sin romper el cron
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Error consultando dolarapi" },
@@ -31,11 +35,14 @@ export async function GET(request: NextRequest) {
   const supabase = crearClienteServicio();
   const { error } = await supabase
     .from("tipo_cambio")
-    .upsert({ fecha: hoyAR, blue_venta: blueVenta, oficial_venta: oficialVenta }, { onConflict: "fecha" });
+    .upsert(
+      { fecha: hoyAR, blue_venta: blueVenta, oficial_venta: oficialVenta, mep_venta: mepVenta },
+      { onConflict: "fecha" }
+    );
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, fecha: hoyAR, blueVenta, oficialVenta });
+  return NextResponse.json({ ok: true, fecha: hoyAR, blueVenta, oficialVenta, mepVenta });
 }
