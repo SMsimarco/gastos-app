@@ -164,9 +164,12 @@ export function CapturaMovimientos({
   }
 
   useEffect(() => {
-    procesarColaPendiente();
+    const inicio = window.setTimeout(() => void procesarColaPendiente(), 0);
     window.addEventListener("online", procesarColaPendiente);
-    return () => window.removeEventListener("online", procesarColaPendiente);
+    return () => {
+      window.clearTimeout(inicio);
+      window.removeEventListener("online", procesarColaPendiente);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

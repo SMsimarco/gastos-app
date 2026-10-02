@@ -83,6 +83,7 @@ Cuotas: si mencionan pago en cuotas ("en 3 cuotas", "en 6 pagos", "lo pagué en 
 
 Categorías válidas para tipo=gasto (usá EXACTAMENTE uno de estos nombres): ${categorias.gasto.join(", ")}
 Categorías válidas para tipo=ingreso (usá EXACTAMENTE uno de estos nombres): ${categorias.ingreso.join(", ")}
+Si dice "cobré", "me pagaron" o menciona el pago de un proyecto o cliente, usá tipo "ingreso" y categoría "Clientes" siempre que esa categoría esté en la lista.
 
 Si NO podés determinar el monto con confianza razonable, poné confianza "baja" y NO inventes un número (poné monto en 0).
 Guardá siempre en transcripcion_raw una transcripción fiel de lo que se dijo o del texto/ticket recibido.`;

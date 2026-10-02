@@ -30,8 +30,8 @@ export function InstalarPWA() {
     if (localStorage.getItem("gastos-voz-instalar-dismissed") === "1") return;
 
     if (esIOS()) {
-      setVisible(true);
-      return;
+      const inicio = window.setTimeout(() => setVisible(true), 0);
+      return () => window.clearTimeout(inicio);
     }
 
     function onBeforeInstallPrompt(e: Event) {

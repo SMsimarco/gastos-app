@@ -34,12 +34,12 @@ const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "O
 const fmt = (n: number) => Math.round(n).toLocaleString("es-AR");
 
 const tooltipStyle = {
-  background: "#ffffff",
-  border: "1px solid #d7e6f0",
+  background: "#111b2b",
+  border: "1px solid #314158",
   borderRadius: 8,
   color: CHART_CHROME.texto,
   fontSize: 13,
-  boxShadow: "0 4px 16px -4px rgba(15, 37, 51, 0.2)",
+  boxShadow: "0 8px 24px -8px rgba(0, 0, 0, 0.7)",
 };
 
 function Heatmap({ diario }: { diario: Dia[] }) {
@@ -57,7 +57,7 @@ function Heatmap({ diario }: { diario: Dia[] }) {
     if (r < 0.75) return 3;
     return 4;
   };
-  const colores = ["#e3eef5", "#1c5cab33", "#1c5cab88", "#2a78d6", "#3987e5"];
+  const colores = ["#182538", "#164e63", "#0e7490", "#0891b2", "#38bdf8"];
 
   const celdas = [
     ...Array.from({ length: diaSemanaPrimero }, () => null),
@@ -119,16 +119,15 @@ export function GraficoAnio({
   }));
 
   const dataIngresosGastos = useMemo(() => {
-    let acumulado = 0;
-    return resumen.map((r) => {
-      acumulado += r.ingresado_ars - r.gastado_ars;
-      return {
+    return resumen.reduce<Array<{ mes: string; gastado: number; ingresado: number; balanceAcumulado: number }>>((filas, r) => {
+      const anterior = filas.at(-1)?.balanceAcumulado ?? 0;
+      return [...filas, {
         mes: MESES[r.mes - 1],
         gastado: r.gastado_ars,
         ingresado: r.ingresado_ars,
-        balanceAcumulado: acumulado,
-      };
-    });
+        balanceAcumulado: anterior + r.ingresado_ars - r.gastado_ars,
+      }];
+    }, []);
   }, [resumen]);
 
   const { dataArea, categoriasArea } = useMemo(() => {

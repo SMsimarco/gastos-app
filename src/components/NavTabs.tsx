@@ -28,7 +28,7 @@ export function NavTabs() {
       className="fixed inset-x-0 bottom-0 z-20 flex items-stretch overflow-x-auto border-t border-border-soft backdrop-blur-md"
       style={{
         paddingBottom: "env(safe-area-inset-bottom)",
-        backgroundColor: "rgba(255, 255, 255, 0.85)",
+        backgroundColor: "rgba(8, 15, 28, 0.9)",
       }}
     >
       {TABS.map(({ href, label, Icon }) => (

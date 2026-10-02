@@ -66,12 +66,12 @@ function StatTile({ label, valor, destacado }: { label: string; valor: string; d
 }
 
 const tooltipStyle = {
-  background: "#ffffff",
-  border: "1px solid #d7e6f0",
+  background: "#111b2b",
+  border: "1px solid #314158",
   borderRadius: 8,
   color: CHART_CHROME.texto,
   fontSize: 13,
-  boxShadow: "0 4px 16px -4px rgba(15, 37, 51, 0.2)",
+  boxShadow: "0 8px 24px -8px rgba(0, 0, 0, 0.7)",
 };
 
 export function GraficosMes({
@@ -223,7 +223,7 @@ export function GraficosMes({
                   innerRadius={55}
                   outerRadius={90}
                   strokeWidth={2}
-                  stroke="#ffffff"
+                  stroke="#111b2b"
                 >
                   {dataDonut.map((d) => (
                     <Cell key={d.nombre} fill={d.color} />

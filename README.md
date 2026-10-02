@@ -20,7 +20,7 @@ Registro de gastos e ingresos por voz, texto o foto. Le hablás, le escribís, l
 - **Tabla completa** — todos los movimientos, filtrables por fecha/categoría/método de pago/comercio/monto, con edición inline, borrado y exportación a CSV.
 - **Recurrentes y dólar automáticos** — un cron diario carga los gastos fijos (alquiler, servicios) y actualiza la cotización del dólar sin intervención manual.
 - **Multi-usuario** — cada cuenta ve únicamente sus propios datos (aislamiento a nivel de base de datos, no solo de interfaz).
-- **Plan de ahorro** — cada vez que registrás un cobro (ingreso), la app calcula el reparto entre 4 bolsillos (Gastos, Fondo de emergencia, Fondo depto/VOO, Aprender) con una función determinística en TypeScript, no con el LLM, y te avisa por push. También hay un simulador manual ("¿cuánta plata tenés disponible ahora?") que usa el mismo motor. Vos confirmás manualmente cuando ya hiciste el movimiento real en ARQ (la app no mueve plata, solo calcula y lleva el saldo). La pestaña Plan también incluye los objetivos de ahorro personalizados (ex-"Metas").
+- **Plan de inversión** — cada cobro de Clientes se reparte entre Gastos, Emergencia, Largo plazo, Aprender y Por invertir con una función determinística en TypeScript. Las compras chicas se acumulan hasta alcanzar el mínimo configurado. La app avisa por push y registra los saldos cuando confirmás que hiciste los movimientos en ARQ; nunca mueve dinero.
 - **PWA instalable con notificaciones push** — funciona como app nativa en el celular, con cola offline (si capturás sin señal, se sube sola cuando vuelve la conexión) y avisos nativos del navegador sin depender de apps de terceros.
 - **Auto-registro por email (opcional)** — conectás tu Gmail una vez (solo lectura) y cada gasto que hagas con Mercado Pago (u otra billetera que configures) se registra solo, leyendo el mail de confirmación con el mismo Gemini que interpreta un mensaje de texto.
 
@@ -79,6 +79,9 @@ supabase/migrations/0007_push_y_reglas_default.sql
 supabase/migrations/0008_categorias_propias_fotos_metas.sql
 supabase/migrations/0009_plan_ahorro.sql
 supabase/migrations/0010_gmail_integracion.sql
+supabase/migrations/0011_gmail_readonly.sql
+supabase/migrations/0012_presupuesto_general.sql
+supabase/migrations/0014_inversiones_fase_1.sql
 ```
 
 Verificá: `select count(*) from categorias;` → 17.
@@ -163,7 +166,7 @@ vercel --prod
 - **Reglas de comercio antes que IA.** Si un comercio ya tiene una regla propia (`reglas_comercio`), esa categoría gana sobre lo que sugiere el modelo — determinismo por sobre inferencia cuando el usuario ya dio la respuesta correcta una vez.
 - **service_role nunca en el cliente.** Cada API route valida la sesión con la anon key primero; recién después usa la service role (que bypassea RLS) para escribir.
 - **Presupuesto se avisa una sola vez por cruce.** El chequeo compara el total antes/después de cada movimiento — solo notifica en la transacción que efectivamente cruza el umbral, no en cada gasto posterior.
-- **Tema claro fijo (blanco/celeste), mobile-first.** Números grandes, tipografía clara, nav inferior fijo para uso con el pulgar.
+- **Tema oscuro fijo, mobile-first.** Números grandes, tipografía clara, nav inferior fijo para uso con el pulgar.
 - **`gmail_integracion` sin policies para `authenticated`.** El refresh_token de Gmail es más sensible que el resto de los datos del usuario (da acceso de lectura a la casilla completa) — ni el propio dueño puede leer/escribir esa fila desde el cliente, todo pasa por rutas server-side auditadas con `service_role` (ver `SECURITY.md`).
 
 ## Roadmap

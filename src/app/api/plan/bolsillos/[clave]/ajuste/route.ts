@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
-const CLAVES_VALIDAS = ["gastos", "emergencia", "depto", "aprender"] as const;
+const CLAVES_VALIDAS = ["gastos", "emergencia", "largo_plazo", "aprender", "por_invertir"] as const;
 
 export async function POST(
   request: NextRequest,
@@ -21,8 +21,8 @@ export async function POST(
   }
 
   const { saldo_real, tc_usado } = await request.json();
-  if (saldo_real === undefined || saldo_real === null || Number.isNaN(Number(saldo_real))) {
-    return NextResponse.json({ error: "Falta saldo_real" }, { status: 400 });
+  if (saldo_real === undefined || saldo_real === null || !Number.isFinite(Number(saldo_real)) || Number(saldo_real) < 0) {
+    return NextResponse.json({ error: "saldo_real debe ser un número mayor o igual a cero" }, { status: 400 });
   }
 
   const { data: bolsillo } = await supabase

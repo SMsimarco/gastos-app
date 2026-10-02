@@ -76,7 +76,8 @@ export function TablaTodos({ categorias }: { categorias: Categoria[] }) {
   }, [desde, hasta, categoriaId, metodoPago, comercio, montoMin, montoMax]);
 
   useEffect(() => {
-    buscar();
+    const inicio = window.setTimeout(() => void buscar(), 0);
+    return () => window.clearTimeout(inicio);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

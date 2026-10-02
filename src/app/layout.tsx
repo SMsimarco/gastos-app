@@ -29,13 +29,13 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Gastos",
   },
 };
 
 export const viewport = {
-  themeColor: "#eef5fa",
+  themeColor: "#080f1c",
   viewportFit: "cover" as const,
 };
 

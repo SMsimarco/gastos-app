@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { crearClienteServidor, crearClienteServicio } from "@/lib/supabase/server";
+import { crearClienteServidor } from "@/lib/supabase/server";
 import { manejarRepartoDeIngresoEditado } from "@/lib/planData";
 
 const CAMPOS_EDITABLES = ["monto_ars", "categoria_id", "descripcion", "comercio", "metodo_pago", "fecha"] as const;
@@ -27,10 +27,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 });
   }
 
-  const supabaseServicio = crearClienteServicio();
-
   if ("monto_ars" in cambios) {
-    const { data: actual } = await supabaseServicio
+    const { data: actual } = await supabaseAuth
       .from("movimientos")
       .select("moneda_origen, tc_usado")
       .eq("id", id)
@@ -46,7 +44,7 @@ export async function PATCH(
     }
   }
 
-  const { data, error } = await supabaseServicio
+  const { data, error } = await supabaseAuth
     .from("movimientos")
     .update(cambios)
     .eq("id", id)
@@ -58,7 +56,7 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const { avisoRepartoAplicado } = await manejarRepartoDeIngresoEditado(supabaseServicio, id);
+  const { avisoRepartoAplicado } = await manejarRepartoDeIngresoEditado(supabaseAuth, id);
 
   return NextResponse.json({ movimiento: data, avisoRepartoAplicado });
 }
@@ -76,11 +74,9 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const supabaseServicio = crearClienteServicio();
+  const { avisoRepartoAplicado } = await manejarRepartoDeIngresoEditado(supabaseAuth, id);
 
-  const { avisoRepartoAplicado } = await manejarRepartoDeIngresoEditado(supabaseServicio, id);
-
-  const { error } = await supabaseServicio
+  const { error } = await supabaseAuth
     .from("movimientos")
     .delete()
     .eq("id", id)

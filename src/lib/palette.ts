@@ -1,6 +1,4 @@
-// Paleta categorica validada (CVD-safe, orden fijo, no ciclar) para tema
-// claro (la app usa tema claro fijo, blanco/celeste). Ver dataviz skill /
-// references/palette.md.
+// Paleta categorica validada (CVD-safe, orden fijo, no ciclar) para tema oscuro.
 export const PALETTE_CATEGORICA = [
   "#3987e5", // 1 blue
   "#d95926", // 2 orange
@@ -13,8 +11,8 @@ export const PALETTE_CATEGORICA = [
 ] as const;
 
 export const CHART_CHROME = {
-  gridline: "#d7e6f0", // --border
-  axis: "#5c7686", // --muted
-  texto: "#0f2533", // --foreground
-  textoSecundario: "#5c7686", // --muted
+  gridline: "#314158", // --border
+  axis: "#91a3ba", // --muted
+  texto: "#f3f7fb", // --foreground
+  textoSecundario: "#91a3ba", // --muted
 } as const;

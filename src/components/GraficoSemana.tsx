@@ -11,12 +11,12 @@ const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const fmt = (n: number) => Math.round(n).toLocaleString("es-AR");
 
 const tooltipStyle = {
-  background: "#ffffff",
-  border: "1px solid #d7e6f0",
+  background: "#111b2b",
+  border: "1px solid #314158",
   borderRadius: 8,
   color: CHART_CHROME.texto,
   fontSize: 13,
-  boxShadow: "0 4px 16px -4px rgba(15, 37, 51, 0.2)",
+  boxShadow: "0 8px 24px -8px rgba(0, 0, 0, 0.7)",
 };
 
 export function GraficoSemana({

@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      if (guardado.tipo === "ingreso") {
+      if (guardado.tipo === "ingreso" && guardado.categoriaNombre.toLocaleLowerCase("es-AR") === "clientes") {
         const reparto = await generarRepartoParaIngreso(
           supabaseServicio,
           user.id,
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         if (reparto) {
           await enviarPush(supabaseServicio, user.id, {
             title: `Cobraste $${Math.round(guardado.monto_ars).toLocaleString("es-AR")}`,
-            body: resumenRepartoTexto(reparto.detalle),
+            body: `${resumenRepartoTexto(reparto.detalle)}\nSugerencia según tu plan, no asesoramiento financiero.`,
           });
         }
       }
