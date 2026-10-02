@@ -141,6 +141,15 @@ export function IconWallet({ className, size = 24 }: IconProps) {
   );
 }
 
+export function IconTrend({ className, size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <path d="m3 17 6-6 4 4 7-8" />
+      <path d="M15 7h5v5" />
+    </svg>
+  );
+}
+
 export function IconGoogle({ className, size = 24 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className={className}>

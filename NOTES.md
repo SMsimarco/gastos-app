@@ -56,3 +56,21 @@
 - https://ai.google.dev/gemini-api/docs/generate-content/audio
 - https://ai.google.dev/gemini-api/docs/interactions-overview
 - https://ai.google.dev/gemini-api/docs/rate-limits
+
+---
+
+# Verificación del proveedor de precios (2026-10-02)
+
+## Proveedor elegido: Twelve Data
+
+- Endpoint: `GET https://api.twelvedata.com/time_series`, con `interval=1day` y hasta 370 cierres por ticker.
+- El plan Basic gratuito publicado ofrece 8 créditos por minuto y 800 por día para uso personal e interno. Una serie temporal cuesta 1 crédito por símbolo, suficiente para consultar una vez cada ticker activo de lunes a viernes.
+- Conserva más de diez años de históricos diarios y permite hasta 5.000 registros por pedido. Los precios diarios vienen ajustados por splits.
+- Se eligió porque permite cargar en una llamada el historial necesario para costo, gráfico y benchmark. El cron deduplica tickers entre usuarios y, si una consulta falla, mantiene el último cierre guardado.
+
+## Fuentes
+
+- https://twelvedata.com/pricing
+- https://support.twelvedata.com/en/articles/5620512-how-to-create-a-request
+- https://support.twelvedata.com/en/articles/5549842-twelve-data-quality-standards
+- https://support.twelvedata.com/en/articles/5179064-are-the-prices-adjusted

@@ -12,6 +12,18 @@ export type Movimiento = {
   transcripcion_raw: string;
 };
 
+export type OperacionExtraida = {
+  tipo: "compra" | "venta" | "dividendo";
+  ticker: string;
+  monto_usd: number;
+  precio_usd: number;
+  cantidad: number;
+  comision_usd: number;
+  fecha: string;
+  confianza: "alta" | "media" | "baja";
+  transcripcion_raw: string;
+};
+
 const CATEGORIAS_GASTO_DEFAULT = [
   "Supermercado",
   "Delivery/Restaurantes",
@@ -121,6 +133,22 @@ const MOVIMIENTO_SCHEMA = {
   ],
 };
 
+const OPERACION_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    tipo: { type: "STRING", enum: ["compra", "venta", "dividendo"] },
+    ticker: { type: "STRING" },
+    monto_usd: { type: "NUMBER" },
+    precio_usd: { type: "NUMBER" },
+    cantidad: { type: "NUMBER" },
+    comision_usd: { type: "NUMBER" },
+    fecha: { type: "STRING" },
+    confianza: { type: "STRING", enum: ["alta", "media", "baja"] },
+    transcripcion_raw: { type: "STRING" },
+  },
+  required: ["tipo", "ticker", "monto_usd", "precio_usd", "cantidad", "comision_usd", "fecha", "confianza", "transcripcion_raw"],
+};
+
 export async function extraerMovimientos(input: {
   base64Data?: string;
   mimeType?: string;
@@ -144,10 +172,12 @@ export async function extraerMovimientos(input: {
 
 export type ResultadoTexto =
   | { intencion: "registro"; movimientos: Movimiento[] }
-  | { intencion: "consulta"; pregunta: string };
+  | { intencion: "consulta"; pregunta: string }
+  | { intencion: "operacion"; operacion: OperacionExtraida };
 
-export async function clasificarYExtraerTexto(
-  textoMensaje: string,
+async function clasificarEntrada(
+  parts: Array<Record<string, unknown>>,
+  textoFallback: string,
   categorias?: ListasCategorias
 ): Promise<ResultadoTexto> {
   const fechaHoyAR = new Date().toLocaleDateString("en-CA", {
@@ -159,30 +189,44 @@ export async function clasificarYExtraerTexto(
 
 Antes que nada, decidí la intención del mensaje:
 - "registro": el usuario está contando un gasto o ingreso nuevo para guardar.
-- "consulta": el usuario está PREGUNTANDO sobre sus gastos pasados (ej. "¿cuánto gasté en comida?", "¿en qué se me fue la plata este mes?", "cuánto gasté ayer").
+- "consulta": el usuario está preguntando sobre sus gastos pasados.
+- "operacion": compró, vendió o cobró un dividendo de una inversión (por ejemplo, "compré 125 dólares de VOO a 703").
 
-Si es "consulta", dejá "movimientos" como array vacío y poné la pregunta tal cual en "pregunta".
-Si es "registro", llená "movimientos" normalmente y "pregunta" puede quedar vacía.`;
+Para una operación extraé únicamente datos que el usuario haya dicho: ticker, monto total en USD, precio unitario en USD, cantidad, comisión y fecha. No calcules cantidad, montos ni rendimientos. Si falta ticker, monto o precio en una compra/venta, usá 0 para el dato faltante y confianza "baja". La comisión es 0 si no se menciona.
+Si es consulta, dejá movimientos vacío y poné la pregunta textual. Si es operación, dejá movimientos vacío y completá operacion.`;
 
   const schema = {
     type: "OBJECT",
     properties: {
-      intencion: { type: "STRING", enum: ["registro", "consulta"] },
+      intencion: { type: "STRING", enum: ["registro", "consulta", "operacion"] },
       movimientos: { type: "ARRAY", items: MOVIMIENTO_SCHEMA },
       pregunta: { type: "STRING" },
+      operacion: { ...OPERACION_SCHEMA, nullable: true },
     },
-    required: ["intencion", "movimientos", "pregunta"],
+    required: ["intencion", "movimientos", "pregunta", "operacion"],
   };
 
-  const data = await generarJSON(
-    [{ text: prompt }, { text: `Mensaje del usuario: "${textoMensaje}"` }],
-    schema
-  );
-
-  if (data.intencion === "consulta") {
-    return { intencion: "consulta", pregunta: data.pregunta || textoMensaje };
+  const data = await generarJSON([{ text: prompt }, ...parts], schema);
+  if (data.intencion === "consulta") return { intencion: "consulta", pregunta: data.pregunta || textoFallback };
+  if (data.intencion === "operacion" && data.operacion) {
+    return { intencion: "operacion", operacion: data.operacion };
   }
   return { intencion: "registro", movimientos: data.movimientos ?? [] };
+}
+
+export async function clasificarYExtraerTexto(
+  textoMensaje: string,
+  categorias?: ListasCategorias
+): Promise<ResultadoTexto> {
+  return clasificarEntrada([{ text: `Mensaje del usuario: "${textoMensaje}"` }], textoMensaje, categorias);
+}
+
+export async function clasificarYExtraerAudio(
+  base64Data: string,
+  mimeType: string,
+  categorias?: ListasCategorias
+): Promise<ResultadoTexto> {
+  return clasificarEntrada([{ inlineData: { mimeType, data: base64Data } }], "Audio del usuario", categorias);
 }
 
 export type FiltrosConsulta = {

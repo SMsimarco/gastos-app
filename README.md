@@ -21,6 +21,7 @@ Registro de gastos e ingresos por voz, texto o foto. Le hablás, le escribís, l
 - **Recurrentes y dólar automáticos** — un cron diario carga los gastos fijos (alquiler, servicios) y actualiza la cotización del dólar sin intervención manual.
 - **Multi-usuario** — cada cuenta ve únicamente sus propios datos (aislamiento a nivel de base de datos, no solo de interfaz).
 - **Plan de inversión** — cada cobro de Clientes se reparte entre Gastos, Emergencia, Largo plazo, Aprender y Por invertir con una función determinística en TypeScript. Las compras chicas se acumulan hasta alcanzar el mínimo configurado. La app avisa por push y registra los saldos cuando confirmás que hiciste los movimientos en ARQ; nunca mueve dinero.
+- **Cartera y rendimiento** — registra compras de activos por formulario, texto o voz, calcula costo promedio, valor, ganancia y comparación contra VOO. También estima el rendimiento nominal y real de las cuentas remuneradas.
 - **PWA instalable con notificaciones push** — funciona como app nativa en el celular, con cola offline (si capturás sin señal, se sube sola cuando vuelve la conexión) y avisos nativos del navegador sin depender de apps de terceros.
 - **Auto-registro por email (opcional)** — conectás tu Gmail una vez (solo lectura) y cada gasto que hagas con Mercado Pago (u otra billetera que configures) se registra solo, leyendo el mail de confirmación con el mismo Gemini que interpreta un mensaje de texto.
 
@@ -50,12 +51,12 @@ Usuario (audio / texto / foto / pregunta)
         │                          ▼
         │                    Supabase (Postgres + RLS por usuario)
         │                          │
-        └──────────────────────────┴──► Hoy / Resumen (Semana·Mes·Año) / Plan / Todos / Presupuestos
+        └──────────────────────────┴──► Hoy / Resumen / Plan / Cartera / Todos / Presupuestos
                                     │
                                     ▼
                          Web Push (confirmación, presupuesto excedido, recurrentes)
 
-Vercel Cron (diario) ──► /api/cron/tipo-cambio, /api/cron/recurrentes
+Vercel Cron ──► tipo de cambio, recurrentes, Gmail y cierres diarios de cartera
 ```
 
 Toda la lógica de negocio vive en API routes de Next.js — no hay orquestador externo. Las claves sensibles (service role de Supabase, API key de Gemini, clave privada VAPID) nunca se exponen al navegador.
@@ -82,6 +83,7 @@ supabase/migrations/0010_gmail_integracion.sql
 supabase/migrations/0011_gmail_readonly.sql
 supabase/migrations/0012_presupuesto_general.sql
 supabase/migrations/0014_inversiones_fase_1.sql
+supabase/migrations/0015_cartera.sql
 ```
 
 Verificá: `select count(*) from categorias;` → 17.
@@ -110,11 +112,15 @@ npx web-push generate-vapid-keys
 
 Te da `NEXT_PUBLIC_VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`. `VAPID_SUBJECT_EMAIL` es cualquier email de contacto (requisito del protocolo, no se usa para nada más). Sin esto configurado, la app funciona igual — simplemente no manda avisos.
 
-### 4. Cron (recurrentes + tipo de cambio + Gmail)
+### 4. Precios de la cartera
+
+Creá una API key gratuita en [Twelve Data](https://twelvedata.com) y guardala como `TWELVE_DATA_API_KEY`. El cron de lunes a viernes consulta el cierre diario de cada ticker de mercado incluido en alguna política. Si el proveedor falla, la app conserva el último precio y lo marca como desactualizado.
+
+### 5. Cron (recurrentes + tipo de cambio + Gmail + precios)
 
 `CRON_SECRET` — cualquier string random largo (`openssl rand -hex 24`). Vercel lo manda automáticamente como header `Authorization: Bearer <valor>` en cada invocación programada (ver `vercel.json`); las rutas lo validan y rechazan cualquier otro llamado.
 
-### 5. Gmail — auto-registro de gastos (opcional)
+### 6. Gmail — auto-registro de gastos (opcional)
 
 Lee la casilla del usuario buscando mails de billeteras virtuales (Mercado Pago por default, configurable) y registra el gasto solo, con el mismo pipeline de Gemini que un mensaje de texto. La app **no** mueve plata ni tiene permiso de escritura sobre el mail, solo lectura (`gmail.readonly`), y cada mail leído se etiqueta para no reprocesarlo.
 
@@ -126,7 +132,7 @@ Lee la casilla del usuario buscando mails de billeteras virtuales (Mercado Pago 
 2. Variables: `GOOGLE_GMAIL_CLIENT_ID` y `GOOGLE_GMAIL_CLIENT_SECRET` (los de esa credencial). Sin esto, la app funciona igual — la card de "Auto-registro por email" en Presupuestos muestra error al tocar "Conectar con Gmail" en vez de romper.
 3. Desde la app: Presupuestos → "Conectar con Gmail" → autorizás una vez. El cron diario (`/api/cron/gmail-mp`, 10:30 UTC) revisa la casilla solo; también hay un botón "Revisar ahora" para probarlo al toque.
 
-### 6. Variables de entorno
+### 7. Variables de entorno
 
 Copiá `.env.example` a `.env.local`:
 
@@ -139,18 +145,19 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT_EMAIL=
 CRON_SECRET=
+TWELVE_DATA_API_KEY=
 GOOGLE_GMAIL_CLIENT_ID=
 GOOGLE_GMAIL_CLIENT_SECRET=
 ```
 
-### 7. Correr local
+### 8. Correr local
 
 ```bash
 npm install
 npm run dev
 ```
 
-### 8. Deploy en Vercel
+### 9. Deploy en Vercel
 
 ```bash
 vercel link

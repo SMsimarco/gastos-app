@@ -97,9 +97,23 @@ export function CapturaMovimientos({
     tipo?: string;
     respuesta?: string;
     resultados?: Array<Record<string, unknown>>;
+    guardado?: boolean;
+    necesitaAclaracion?: string;
+    operacion?: { activo?: { ticker?: string }; montoUsd?: number; avisoSaldoNegativo?: string };
   }) {
     if (data.tipo === "consulta") {
       setMensaje({ texto: data.respuesta ?? "", tipo: "ok" });
+      return;
+    }
+
+    if (data.tipo === "operacion") {
+      if (!data.guardado) {
+        setMensaje({ texto: `🤔 ${data.necesitaAclaracion ?? "Necesito más datos de la operación."}`, tipo: "warn" });
+        return;
+      }
+      const ticker = data.operacion?.activo?.ticker ?? "activo";
+      const aviso = data.operacion?.avisoSaldoNegativo ? ` ${data.operacion.avisoSaldoNegativo}` : "";
+      setMensaje({ texto: `Operación de ${ticker} registrada.${aviso}`, tipo: aviso ? "warn" : "ok" });
       return;
     }
 
