@@ -6,10 +6,10 @@ import { ActivarNotificaciones } from "@/components/ActivarNotificaciones";
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
-      <NavTabs />
       <InstalarPWA />
       <ActivarNotificaciones />
-      {children}
+      <div style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}>{children}</div>
+      <NavTabs />
     </>
   );
 }

@@ -56,7 +56,7 @@ function sumarMeses(fechaISO: string, n: number): string {
 export async function guardarMovimiento(
   supabase: SupabaseClient,
   item: Movimiento,
-  fuente: "audio" | "texto" | "foto",
+  fuente: "audio" | "texto" | "foto" | "email",
   usuarioId: string,
   fotoPath: string | null = null
 ) {

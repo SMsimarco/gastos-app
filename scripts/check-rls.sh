@@ -11,6 +11,10 @@ PERMITIDOS=(
   "src/app/api/movimientos/[id]/route.ts"
   "src/app/api/movimientos/[id]/foto/route.ts"
   "src/app/api/push/subscribe/route.ts"
+  "src/app/api/gmail/callback/route.ts"
+  "src/app/api/gmail/desconectar/route.ts"
+  "src/app/api/gmail/config/route.ts"
+  "src/app/api/gmail/revisar-ahora/route.ts"
 )
 
 ENCONTRADOS=$(grep -rl "crearClienteServicio" src --include="*.ts" --include="*.tsx" | grep -v "/api/cron/" || true)

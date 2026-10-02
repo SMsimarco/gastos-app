@@ -1,16 +1,18 @@
 @import "tailwindcss";
 
+/* Tema oscuro fijo, mobile-first. */
 :root {
-  --background: #08090a;
-  --surface: #131415;
-  --surface-2: #1a1c1e;
-  --border: #232527;
-  --border-soft: #1d1f21;
-  --foreground: #f3f4f5;
-  --muted: #8b8f94;
-  --accent: #34d399;
-  --accent-soft: #34d39926;
-  --danger: #f87171;
+  --background: #080f1c;
+  --surface: #111b2b;
+  --surface-2: #182538;
+  --border: #314158;
+  --border-soft: #223148;
+  --foreground: #f3f7fb;
+  --muted: #91a3ba;
+  --accent: #38bdf8;
+  --accent-soft: #38bdf824;
+  --positive: #4ade80;
+  --danger: #fb7185;
 }
 
 @theme inline {
@@ -22,15 +24,14 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-positive: var(--positive);
   --color-danger: var(--danger);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background:
-    radial-gradient(ellipse 900px 500px at 50% -10%, #1a2e2380, transparent),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
   min-height: 100vh;
 }
@@ -44,7 +45,22 @@ body {
   background: var(--surface);
   border: 1px solid var(--border-soft);
   border-radius: 1rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.7);
+}
+
+.input-plan {
+  width: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.75rem;
+  background: var(--surface-2);
+  padding: 0.625rem 0.75rem;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.input-plan:focus {
+  border-color: var(--accent);
 }
 
 .pressable {

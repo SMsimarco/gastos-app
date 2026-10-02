@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { crearClienteServidor, crearClienteServicio } from "@/lib/supabase/server";
+import { crearClienteServidor } from "@/lib/supabase/server";
 import { urlFirmadaTicket } from "@/lib/storage";
 
 export async function GET(
@@ -15,9 +15,7 @@ export async function GET(
   }
 
   const { id } = await params;
-  const supabaseServicio = crearClienteServicio();
-
-  const { data: movimiento } = await supabaseServicio
+  const { data: movimiento } = await supabaseAuth
     .from("movimientos")
     .select("foto_path")
     .eq("id", id)
@@ -28,7 +26,7 @@ export async function GET(
     return NextResponse.json({ error: "Sin foto" }, { status: 404 });
   }
 
-  const url = await urlFirmadaTicket(supabaseServicio, movimiento.foto_path);
+  const url = await urlFirmadaTicket(supabaseAuth, movimiento.foto_path);
   if (!url) {
     return NextResponse.json({ error: "No pude generar la URL" }, { status: 500 });
   }
