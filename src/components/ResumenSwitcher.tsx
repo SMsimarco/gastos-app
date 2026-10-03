@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type TouchEvent } from "react";
 import { GraficoSemana } from "@/components/GraficoSemana";
 import { GraficosMes, type Kpis, type Gasto } from "@/components/GraficosMes";
 import { GraficoAnio } from "@/components/GraficoAnio";
@@ -58,9 +58,32 @@ export function ResumenSwitcher({
   };
 }) {
   const [periodo, setPeriodo] = useState<Periodo>("mes");
+  const inicioToque = useRef<{ x: number; y: number } | null>(null);
+
+  function alEmpezarToque(e: TouchEvent) {
+    // Si el gesto arranca en un área con scroll horizontal propio (gráfico del año), no cambia de período.
+    if ((e.target as HTMLElement).closest(".overflow-x-auto")) return;
+    const toque = e.touches[0];
+    inicioToque.current = { x: toque.clientX, y: toque.clientY };
+  }
+
+  // Deslizar a la izquierda avanza (Semana > Mes > Año), a la derecha vuelve.
+  // Se ignoran gestos mayormente verticales (scroll) o cortos.
+  function alTerminarToque(e: TouchEvent) {
+    const inicio = inicioToque.current;
+    inicioToque.current = null;
+    if (!inicio) return;
+    const toque = e.changedTouches[0];
+    const dx = toque.clientX - inicio.x;
+    const dy = toque.clientY - inicio.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const indice = PERIODOS.findIndex((p) => p.id === periodo);
+    const siguiente = PERIODOS[indice + (dx < 0 ? 1 : -1)];
+    if (siguiente) setPeriodo(siguiente.id);
+  }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" onTouchStart={alEmpezarToque} onTouchEnd={alTerminarToque}>
       <div className="sticky top-0 z-10 backdrop-blur-md px-4 pt-4 pb-2" style={{ backgroundColor: "rgba(238, 245, 250, 0.85)" }}>
         <div className="flex gap-1 bg-surface-2 rounded-xl p-1 w-full max-w-md mx-auto">
           {PERIODOS.map((p) => (
