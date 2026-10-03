@@ -17,6 +17,10 @@ PERMITIDOS=(
   "src/app/api/gmail/revisar-ahora/route.ts"
   # Webhook externo: valida TELEGRAM_WEBHOOK_SECRET y resuelve usuario_id por chat_id.
   "src/app/api/telegram/webhook/route.ts"
+  # Laboratorio (SIMULADO): los llama pg_cron con LAB_CRON_SECRET y escriben tablas globales de mercado (sin usuario_id).
+  "src/app/api/lab/monitor/route.ts"
+  "src/app/api/lab/noticias/route.ts"
+  "src/app/api/lab/macro/route.ts"
 )
 
 ENCONTRADOS=$(grep -rl "crearClienteServicio" src --include="*.ts" --include="*.tsx" | grep -v "/api/cron/" || true)

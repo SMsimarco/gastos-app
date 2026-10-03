@@ -36,3 +36,15 @@ App multi-tenant. Cada tabla per-user tiene RLS activado con policies `using` +
 $CRON_SECRET`. Dentro de un cron, todo filtro por usuario sigue siendo manual
 (no hay RLS evaluándose) — cada query per-user necesita su `.eq("usuario_id", ...)`
 explícito.
+
+## Laboratorio (`/api/lab/*`)
+
+`src/app/api/lab/{monitor,noticias,macro}/route.ts` los llama `pg_cron` de Supabase con
+`Authorization: Bearer $LAB_CRON_SECRET` (comparación en tiempo constante, ver
+`src/lib/laboratorio/auth.ts`). Usan `crearClienteServicio` porque escriben tablas **globales** de
+datos de mercado (`lab_precios`, `lab_indicadores`, `lab_noticias`, `lab_macro`,
+`lab_eventos_*`, `lab_costos_ia`, `lab_ejecuciones`), que no tienen `usuario_id`: los usuarios
+solo pueden leerlas (policy `select` para `authenticated`, sin policies de escritura). La
+configuración por usuario (`lab_config`) tiene RLS `auth.uid() = usuario_id`. Ninguna tabla `lab_`
+referencia el plan real. Las rutas están en la allowlist de `scripts/check-rls.sh` y de
+`eslint.config.mjs`. `GET /api/laboratorio` (el panel) usa el cliente del usuario con RLS.
