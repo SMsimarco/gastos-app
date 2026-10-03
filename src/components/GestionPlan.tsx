@@ -274,7 +274,7 @@ export function GestionPlan({
             <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">Inflación mensual estimada (%)<input type="number" min="0" step="0.01" defaultValue={config.inflacion_mensual_pct ?? ""} onBlur={(e) => guardarConfig({ inflacion_mensual_pct: e.target.value ? Number(e.target.value) : null })} className="input-plan" /></label>
             <label className="flex flex-col gap-1 text-xs text-muted">Objetivo depto (US$)<input type="number" min="1" defaultValue={config.monto_objetivo_depto_usd ?? ""} onBlur={(e) => guardarConfig({ monto_objetivo_depto_usd: e.target.value ? Number(e.target.value) : null })} className="input-plan" /></label>
             <label className="flex flex-col gap-1 text-xs text-muted">Fecha objetivo<input type="date" defaultValue={config.fecha_objetivo_depto ?? ""} onBlur={(e) => guardarConfig({ fecha_objetivo_depto: e.target.value || null })} className="input-plan" /></label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">Rendimiento real anual supuesto (%)<input type="number" min="-99" max="100" step="0.1" defaultValue={Number(config.rendimiento_anual_supuesto ?? 0.07) * 100} onBlur={(e) => guardarConfig({ rendimiento_anual_supuesto: Number(e.target.value) / 100 })} className="input-plan" /></label>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">Rendimiento real anual supuesto (%)<input type="number" min="-99" max="100" step="0.1" defaultValue={Number((Number(config.rendimiento_anual_supuesto ?? 0.07) * 100).toFixed(1))} onBlur={(e) => guardarConfig({ rendimiento_anual_supuesto: Number(e.target.value) / 100 })} className="input-plan" /></label>
           </div>
         </section>
       )}
