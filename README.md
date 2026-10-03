@@ -57,7 +57,7 @@ Usuario (audio / texto / foto / pregunta)
                                     ▼
                          Web Push (confirmación, presupuesto excedido, recurrentes)
 
-Vercel Cron ──► tipo de cambio, recurrentes, Gmail y cierres diarios de cartera
+Vercel Cron ──► tipo de cambio, recurrentes, Gmail, precios y avisos de Telegram
 ```
 
 Toda la lógica de negocio vive en API routes de Next.js — no hay orquestador externo. Las claves sensibles (service role de Supabase, API key de Gemini, clave privada VAPID) nunca se exponen al navegador.
@@ -146,6 +146,8 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT_EMAIL=
 CRON_SECRET=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
 TWELVE_DATA_API_KEY=
 GOOGLE_GMAIL_CLIENT_ID=
 GOOGLE_GMAIL_CLIENT_SECRET=
@@ -166,6 +168,14 @@ vercel env add   # cargar cada variable de arriba
 vercel --prod
 ```
 
+### 10. Telegram
+
+El bot `@investfoco_bot` recibe texto y audio con el mismo flujo de captura que la PWA. También ofrece `/resumen`, `/cartera`, `/plan`, `/sugerencias` y `/cobre 700000`. La vinculación se inicia desde **Presupuestos → Telegram** con un código de seis dígitos que vence a los 10 minutos.
+
+Después de desplegar, registrar el webhook HTTPS con `setWebhook` apuntando a `https://gastosvoz.vercel.app/api/telegram/webhook`, enviando el mismo valor de `TELEGRAM_WEBHOOK_SECRET` en `secret_token` y limitando `allowed_updates` a `message` y `callback_query`. El servidor verifica el header `X-Telegram-Bot-Api-Secret-Token` en cada entrega.
+
+Los avisos de mercado se ejecutan después de actualizar precios y se deduplican por usuario y fecha. El resumen semanal se envía los domingos a las 20:00 de Argentina. Todos los avisos financieros incluyen el aviso de que son sugerencias según el plan y no asesoramiento financiero.
+
 ---
 
 ## Decisiones de diseño
@@ -180,5 +190,6 @@ vercel --prod
 ## Roadmap
 
 - [ ] Login con Google
-- [ ] Vinculación de Telegram/WhatsApp por usuario como canal alternativo a Web Push
+- [x] Vinculación de Telegram por usuario como canal alternativo a Web Push
+- [ ] Vinculación de WhatsApp por usuario
 - [ ] Background Sync API para la cola offline (hoy reintenta con el evento `online`, no con sync real en segundo plano)

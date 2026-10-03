@@ -36,6 +36,8 @@ const eslintConfig = defineConfig([
       "src/app/api/gmail/desconectar/route.ts",
       "src/app/api/gmail/config/route.ts",
       "src/app/api/gmail/revisar-ahora/route.ts",
+      // Webhook externo auditado: valida el secreto y deriva usuario_id del chat vinculado.
+      "src/app/api/telegram/webhook/route.ts",
     ],
     rules: {
       "no-restricted-imports": "off",

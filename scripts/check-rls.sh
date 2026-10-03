@@ -15,6 +15,8 @@ PERMITIDOS=(
   "src/app/api/gmail/desconectar/route.ts"
   "src/app/api/gmail/config/route.ts"
   "src/app/api/gmail/revisar-ahora/route.ts"
+  # Webhook externo: valida TELEGRAM_WEBHOOK_SECRET y resuelve usuario_id por chat_id.
+  "src/app/api/telegram/webhook/route.ts"
 )
 
 ENCONTRADOS=$(grep -rl "crearClienteServicio" src --include="*.ts" --include="*.tsx" | grep -v "/api/cron/" || true)

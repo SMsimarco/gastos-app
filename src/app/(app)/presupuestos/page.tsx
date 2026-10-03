@@ -3,6 +3,7 @@ import { GestionPresupuestos, type Presupuesto } from "@/components/GestionPresu
 import { MisCategorias } from "@/components/MisCategorias";
 import { GestionGmail } from "@/components/GestionGmail";
 import { PresupuestoGeneral } from "@/components/PresupuestoGeneral";
+import { GestionTelegram } from "@/components/GestionTelegram";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,10 @@ export default async function PresupuestosPage() {
         mes={inicioMes}
       />
       <div className="w-full max-w-md mx-auto px-5 pb-4">
-        <GestionGmail />
+        <div className="flex flex-col gap-4">
+          <GestionTelegram />
+          <GestionGmail />
+        </div>
       </div>
       <MisCategorias categoriasPropias={todasCategorias ?? []} />
     </main>
