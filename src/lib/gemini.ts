@@ -24,6 +24,12 @@ export type OperacionExtraida = {
   transcripcion_raw: string;
 };
 
+export type ConsultaFinancieraExtraida = {
+  pregunta: string;
+  ticker: string | null;
+  confianza: "alta" | "media" | "baja";
+};
+
 const CATEGORIAS_GASTO_DEFAULT = [
   "Supermercado",
   "Delivery/Restaurantes",
@@ -47,31 +53,43 @@ export type ListasCategorias = {
 };
 
 async function generarJSON(parts: Array<Record<string, unknown>>, schema: Record<string, unknown>) {
-  const res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": process.env.GEMINI_API_KEY!,
-      },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: schema,
-        },
-      }),
+  const modelos = ["gemini-3.6-flash", "gemini-3.5-flash"];
+  let ultimoError = "";
+  for (const modelo of modelos) {
+    for (let intento = 0; intento < 2; intento++) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": process.env.GEMINI_API_KEY!,
+          },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: schema,
+            },
+          }),
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        const textoRespuesta = data.candidates[0].content.parts[0].text;
+        return JSON.parse(textoRespuesta);
+      }
+
+      const detalle = await res.text();
+      ultimoError = `${res.status} ${detalle}`;
+      if (![429, 503].includes(res.status)) {
+        throw new Error(`Gemini falló: ${ultimoError}`);
+      }
+      if (intento === 0) await new Promise((resolver) => setTimeout(resolver, 500));
     }
-  );
-
-  if (!res.ok) {
-    throw new Error(`Gemini falló: ${res.status} ${await res.text()}`);
   }
-
-  const data = await res.json();
-  const textoRespuesta = data.candidates[0].content.parts[0].text;
-  return JSON.parse(textoRespuesta);
+  throw new Error(`Gemini no respondió después de los reintentos: ${ultimoError}`);
 }
 
 function construirPrompt(fechaHoyAR: string, categorias: ListasCategorias) {
@@ -173,7 +191,10 @@ export async function extraerMovimientos(input: {
 export type ResultadoTexto =
   | { intencion: "registro"; movimientos: Movimiento[] }
   | { intencion: "consulta"; pregunta: string }
-  | { intencion: "operacion"; operacion: OperacionExtraida };
+  | { intencion: "operacion"; operacion: OperacionExtraida }
+  | { intencion: "consulta_inversiones"; consulta: ConsultaFinancieraExtraida }
+  | { intencion: "consulta_plan"; consulta: ConsultaFinancieraExtraida }
+  | { intencion: "pedir_sugerencia"; consulta: ConsultaFinancieraExtraida };
 
 async function clasificarEntrada(
   parts: Array<Record<string, unknown>>,
@@ -191,25 +212,54 @@ Antes que nada, decidí la intención del mensaje:
 - "registro": el usuario está contando un gasto o ingreso nuevo para guardar.
 - "consulta": el usuario está preguntando sobre sus gastos pasados.
 - "operacion": compró, vendió o cobró un dividendo de una inversión (por ejemplo, "compré 125 dólares de VOO a 703").
+- "consulta_inversiones": pregunta por valor, rendimiento o composición de su cartera o un activo (por ejemplo, "¿cuánto me rinde VOO?" o "¿cuánto tengo en total?").
+- "consulta_plan": pregunta por bolsillos, fondo de emergencia, metas o avance hacia el departamento.
+- "pedir_sugerencia": pide consejo o una acción (por ejemplo, "¿qué hago con esta plata?" o "¿me conviene comprar YPF?").
 
 Para una operación extraé únicamente datos que el usuario haya dicho: ticker, monto total en USD, precio unitario en USD, cantidad, comisión y fecha. No calcules cantidad, montos ni rendimientos. Si falta ticker, monto o precio en una compra/venta, usá 0 para el dato faltante y confianza "baja". La comisión es 0 si no se menciona.
+Para las tres consultas financieras, copiá la pregunta, extraé el ticker solo si se menciona explícitamente y evaluá confianza sobre la intención. No respondas la pregunta ni calcules nada.
 Si es consulta, dejá movimientos vacío y poné la pregunta textual. Si es operación, dejá movimientos vacío y completá operacion.`;
+
+  const consultaFinancieraSchema = {
+    type: "OBJECT",
+    properties: {
+      pregunta: { type: "STRING" },
+      ticker: { type: "STRING", nullable: true },
+      confianza: { type: "STRING", enum: ["alta", "media", "baja"] },
+    },
+    required: ["pregunta", "ticker", "confianza"],
+  };
 
   const schema = {
     type: "OBJECT",
     properties: {
-      intencion: { type: "STRING", enum: ["registro", "consulta", "operacion"] },
+      intencion: {
+        type: "STRING",
+        enum: ["registro", "consulta", "operacion", "consulta_inversiones", "consulta_plan", "pedir_sugerencia"],
+      },
       movimientos: { type: "ARRAY", items: MOVIMIENTO_SCHEMA },
       pregunta: { type: "STRING" },
       operacion: { ...OPERACION_SCHEMA, nullable: true },
+      consulta_financiera: { ...consultaFinancieraSchema, nullable: true },
     },
-    required: ["intencion", "movimientos", "pregunta", "operacion"],
+    required: ["intencion", "movimientos", "pregunta", "operacion", "consulta_financiera"],
   };
 
   const data = await generarJSON([{ text: prompt }, ...parts], schema);
   if (data.intencion === "consulta") return { intencion: "consulta", pregunta: data.pregunta || textoFallback };
   if (data.intencion === "operacion" && data.operacion) {
     return { intencion: "operacion", operacion: data.operacion };
+  }
+  if (["consulta_inversiones", "consulta_plan", "pedir_sugerencia"].includes(data.intencion)) {
+    const consulta = data.consulta_financiera;
+    return {
+      intencion: data.intencion,
+      consulta: {
+        pregunta: consulta?.pregunta || textoFallback,
+        ticker: consulta?.ticker?.trim().toUpperCase() || null,
+        confianza: consulta?.confianza ?? "baja",
+      },
+    };
   }
   return { intencion: "registro", movimientos: data.movimientos ?? [] };
 }
@@ -268,4 +318,37 @@ Pregunta: "${pregunta}"`;
   };
 
   return generarJSON([{ text: prompt }], schema);
+}
+
+export async function redactarRespuestaDesdeHechos(input: {
+  pregunta: string;
+  hechos: Record<string, unknown>;
+  esSugerencia: boolean;
+  respuestaBase: string;
+}): Promise<string> {
+  const cierre = "Sugerencia según tu plan, no asesoramiento financiero.";
+  const prompt = `Redactá una respuesta breve en español rioplatense a la pregunta del usuario usando EXCLUSIVAMENTE los hechos JSON provistos.
+No calcules, no infieras y no agregues ningún número que no aparezca literalmente en los hechos. No recomiendes activos fuera de politica ni opines si son buenos o malos. Nunca sugieras vender el largo plazo porque subió o bajó.
+Si fuera_de_politica es true, explicá solamente que el ticker no está en el plan del usuario y que por eso no podés sugerirlo.
+Si la lista de sugerencias está vacía, decí que no hay una acción pendiente según el plan.
+${input.esSugerencia ? `Terminá exactamente con esta línea, una sola vez: ${cierre}` : "No agregues un descargo financiero."}
+
+Pregunta: ${input.pregunta}
+Hechos JSON: ${JSON.stringify(input.hechos)}
+Respuesta base calculada por el código: ${input.respuestaBase}`;
+  const schema = {
+    type: "OBJECT",
+    properties: { respuesta: { type: "STRING" } },
+    required: ["respuesta"],
+  };
+  let respuesta = input.respuestaBase;
+  try {
+    const data = await generarJSON([{ text: prompt }], schema);
+    respuesta = String(data.respuesta ?? input.respuestaBase).trim();
+  } catch {
+    respuesta = input.respuestaBase;
+  }
+  if (!input.esSugerencia) return respuesta;
+  const sinCierre = respuesta.replaceAll(cierre, "").trim();
+  return `${sinCierre}\n${cierre}`;
 }
