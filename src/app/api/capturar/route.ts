@@ -9,6 +9,7 @@ import { obtenerListasCategorias } from "@/lib/categorias";
 import { subirFotoTicket } from "@/lib/storage";
 import { generarRepartoParaIngreso, resumenRepartoTexto } from "@/lib/planData";
 import { registrarOperacion } from "@/lib/inversiones/carteraData";
+import { responderConsultaInversiones } from "@/lib/inversiones/consultasInversiones";
 
 export async function POST(request: NextRequest) {
   const supabaseAuth = await crearClienteServidor();
@@ -55,6 +56,25 @@ export async function POST(request: NextRequest) {
         : await clasificarYExtraerAudio(base64Data!, mimeType!, categorias);
       if (resultado.intencion === "consulta") {
         const respuesta = await responderConsulta(supabaseServicio, user.id, resultado.pregunta);
+        return NextResponse.json({ tipo: "consulta", respuesta });
+      }
+      if (
+        resultado.intencion === "consulta_inversiones" ||
+        resultado.intencion === "consulta_plan" ||
+        resultado.intencion === "pedir_sugerencia"
+      ) {
+        if (resultado.consulta.confianza === "baja") {
+          return NextResponse.json({
+            tipo: "consulta",
+            respuesta: "No entendí bien si querés consultar tu cartera, tu plan o pedir una sugerencia. ¿Me lo decís de otra forma?",
+          });
+        }
+        const respuesta = await responderConsultaInversiones(
+          supabaseServicio,
+          user.id,
+          resultado.intencion,
+          resultado.consulta
+        );
         return NextResponse.json({ tipo: "consulta", respuesta });
       }
       if (resultado.intencion === "operacion") {

@@ -74,3 +74,17 @@
 - https://support.twelvedata.com/en/articles/5620512-how-to-create-a-request
 - https://support.twelvedata.com/en/articles/5549842-twelve-data-quality-standards
 - https://support.twelvedata.com/en/articles/5179064-are-the-prices-adjusted
+
+---
+
+# Fase 3 — casos manuales de consultas
+
+Probar por texto y por voz desde la captura principal. Las respuestas usan datos reales de Supabase; por eso los importes exactos varían según el usuario.
+
+1. **“¿Qué hago con esta plata?”** — se clasifica como `pedir_sugerencia`, enumera únicamente reglas activas ordenadas por prioridad y termina con “Sugerencia según tu plan, no asesoramiento financiero.”
+2. **“¿Cuánto me rinde VOO?”** — se clasifica como `consulta_inversiones` y responde con costo, valor y rendimiento ya calculados por `rendimiento.ts`.
+3. **“¿Cuánto me falta para la emergencia?”** — se clasifica como `consulta_plan` y usa saldo y meta reales del bolsillo Emergencia.
+4. **“¿Me conviene comprar YPF?”** — se clasifica como `pedir_sugerencia`; si YPF no está en `activos.en_politica`, explica solo que está fuera del plan, sin recomendarla ni desaconsejarla, y agrega el cierre fijo.
+5. **“¿Cuánto tengo en total?”** — se clasifica como `consulta_inversiones` y usa el total calculado de la cartera.
+
+Si la clasificación tiene confianza baja, la app pide reformular y no consulta ni guarda datos.
