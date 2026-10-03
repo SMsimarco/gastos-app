@@ -22,6 +22,9 @@ type ConfigPlan = {
   gasto_mensual_manual: number | null;
   minimo_compra_usd: number;
   inflacion_mensual_pct: number | null;
+  fecha_objetivo_depto: string | null;
+  monto_objetivo_depto_usd: number | null;
+  rendimiento_anual_supuesto: number;
 } | null;
 type DetalleReparto = Record<ClaveBolsillo, number> & {
   metaEmergenciaUsd: number;
@@ -163,6 +166,7 @@ export function GestionPlan({
         body: JSON.stringify(cambios),
       }));
       setConfig(data.config);
+      window.dispatchEvent(new Event("plan-config-actualizada"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No pude guardar la configuración");
     } finally {
@@ -268,6 +272,9 @@ export function GestionPlan({
             <label className="flex flex-col gap-1 text-xs text-muted">Mínimo de compra (US$)<input type="number" min="1" defaultValue={config.minimo_compra_usd} onBlur={(e) => guardarConfig({ minimo_compra_usd: Number(e.target.value) })} className="input-plan" /></label>
             <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">Gasto mensual manual (si no hay 3 meses de datos)<input type="number" min="0" defaultValue={config.gasto_mensual_manual ?? ""} onBlur={(e) => guardarConfig({ gasto_mensual_manual: e.target.value ? Number(e.target.value) : null })} className="input-plan" /></label>
             <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">Inflación mensual estimada (%)<input type="number" min="0" step="0.01" defaultValue={config.inflacion_mensual_pct ?? ""} onBlur={(e) => guardarConfig({ inflacion_mensual_pct: e.target.value ? Number(e.target.value) : null })} className="input-plan" /></label>
+            <label className="flex flex-col gap-1 text-xs text-muted">Objetivo depto (US$)<input type="number" min="1" defaultValue={config.monto_objetivo_depto_usd ?? ""} onBlur={(e) => guardarConfig({ monto_objetivo_depto_usd: e.target.value ? Number(e.target.value) : null })} className="input-plan" /></label>
+            <label className="flex flex-col gap-1 text-xs text-muted">Fecha objetivo<input type="date" defaultValue={config.fecha_objetivo_depto ?? ""} onBlur={(e) => guardarConfig({ fecha_objetivo_depto: e.target.value || null })} className="input-plan" /></label>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">Rendimiento real anual supuesto (%)<input type="number" min="-99" max="100" step="0.1" defaultValue={Number(config.rendimiento_anual_supuesto ?? 0.07) * 100} onBlur={(e) => guardarConfig({ rendimiento_anual_supuesto: Number(e.target.value) / 100 })} className="input-plan" /></label>
           </div>
         </section>
       )}

@@ -19,6 +19,7 @@ export type ConfigPlanRow = {
   monto_objetivo_depto_usd: number | null;
   anios_transicion: number;
   inflacion_mensual_pct: number | null;
+  rendimiento_anual_supuesto: number;
 };
 
 const CONFIG_DEFAULT: Omit<ConfigPlanRow, "usuario_id"> = {
@@ -33,6 +34,7 @@ const CONFIG_DEFAULT: Omit<ConfigPlanRow, "usuario_id"> = {
   monto_objetivo_depto_usd: null,
   anios_transicion: 3,
   inflacion_mensual_pct: null,
+  rendimiento_anual_supuesto: 0.07,
 };
 
 export async function obtenerConfigPlan(

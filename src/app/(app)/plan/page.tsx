@@ -2,6 +2,7 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { obtenerConfigPlan, obtenerGastoMensualConFuente, obtenerUltimoMep } from "@/lib/planData";
 import { GestionPlan } from "@/components/GestionPlan";
 import { GestionMetas } from "@/components/GestionMetas";
+import { ProyeccionDepto } from "@/components/ProyeccionDepto";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,9 @@ export default async function PlanPage() {
         mepReferenciaInicial={mepReferencia}
         repartoPendienteInicial={repartoPendiente ?? null}
       />
+      <div className="w-full max-w-md mx-auto px-5 pb-6">
+        <ProyeccionDepto />
+      </div>
       <GestionMetas metasIniciales={metas ?? []} />
     </main>
   );
