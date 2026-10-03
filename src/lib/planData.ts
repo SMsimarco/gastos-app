@@ -193,3 +193,58 @@ export function resumenRepartoTexto(detalle: ResultadoReparto): string {
   if (detalle.por_invertir > 0) partes.push(`Por invertir US$${detalle.por_invertir.toFixed(2)}`);
   return partes.join(" · ");
 }
+
+export async function aplicarRepartoUsuario(
+  supabase: SupabaseClient,
+  usuarioId: string,
+  repartoId: string,
+  tcUsado: number
+) {
+  if (!Number.isFinite(tcUsado) || tcUsado <= 0) throw new Error("tc_usado inválido");
+  const { data: reparto } = await supabase
+    .from("repartos")
+    .select("id, monto_ars, estado")
+    .eq("id", repartoId)
+    .eq("usuario_id", usuarioId)
+    .maybeSingle();
+  if (!reparto) throw new Error("No encontrado");
+  if (reparto.estado !== "pendiente") throw new Error("Este reparto ya no está pendiente");
+
+  const calculado = await calcularRepartoParaUsuario(supabase, usuarioId, Number(reparto.monto_ars), tcUsado);
+  if (!calculado) throw new Error("No pude recalcular el reparto con esa cotización");
+  const { error } = await supabase.rpc("aplicar_reparto", {
+    p_usuario_id: usuarioId,
+    p_reparto_id: reparto.id,
+    p_tc_usado: tcUsado,
+    p_detalle: calculado.detalle,
+  });
+  if (error) throw new Error(error.message);
+
+  const [{ data: repartoActualizado }, { data: bolsillos }] = await Promise.all([
+    supabase.from("repartos").select("*").eq("id", reparto.id).single(),
+    supabase.from("bolsillos").select("id, clave, nombre, moneda, saldo, meta, orden").eq("usuario_id", usuarioId).order("orden"),
+  ]);
+  return { reparto: repartoActualizado, bolsillos: bolsillos ?? [] };
+}
+
+export async function descartarRepartoUsuario(
+  supabase: SupabaseClient,
+  usuarioId: string,
+  repartoId: string
+) {
+  const { data: reparto } = await supabase
+    .from("repartos")
+    .select("id, estado")
+    .eq("id", repartoId)
+    .eq("usuario_id", usuarioId)
+    .maybeSingle();
+  if (!reparto) throw new Error("No encontrado");
+  if (reparto.estado !== "pendiente") throw new Error("Este reparto ya no está pendiente");
+  const { error } = await supabase
+    .from("repartos")
+    .update({ estado: "descartado" })
+    .eq("id", repartoId)
+    .eq("usuario_id", usuarioId);
+  if (error) throw new Error(error.message);
+  return { ok: true };
+}
