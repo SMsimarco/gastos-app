@@ -23,6 +23,7 @@ Registro de gastos e ingresos por voz, texto o foto. Le hablás, le escribís, l
 - **Plan de inversión** — cada cobro de Clientes se reparte entre Gastos, Emergencia, Largo plazo, Aprender y Por invertir con una función determinística en TypeScript. Las compras chicas se acumulan hasta alcanzar el mínimo configurado. La app avisa por push y registra los saldos cuando confirmás que hiciste los movimientos en ARQ; nunca mueve dinero.
 - **Cartera y rendimiento** — registra compras de activos por formulario, texto o voz, calcula costo promedio, valor, ganancia y comparación contra VOO. También estima el rendimiento nominal y real de las cuentas remuneradas.
 - **Consultas sobre tu plan** — preguntás por voz o texto cuánto rinde un activo, cuánto falta para una meta o qué acción corresponde según tus propias reglas. Los cálculos salen del código y Gemini solo redacta con esos datos; cualquier sugerencia queda limitada a los activos de tu política.
+- **Proyección del depto** — estima un rango pesimista, base y optimista con el ahorro real de seis meses y muestra cuánto acorta el plazo cada palanca: más proyectos, mejor precio, menos gasto o mayor rendimiento.
 - **PWA instalable con notificaciones push** — funciona como app nativa en el celular, con cola offline (si capturás sin señal, se sube sola cuando vuelve la conexión) y avisos nativos del navegador sin depender de apps de terceros.
 - **Auto-registro por email (opcional)** — conectás tu Gmail una vez (solo lectura) y cada gasto que hagas con Mercado Pago (u otra billetera que configures) se registra solo, leyendo el mail de confirmación con el mismo Gemini que interpreta un mensaje de texto.
 
@@ -85,6 +86,8 @@ supabase/migrations/0011_gmail_readonly.sql
 supabase/migrations/0012_presupuesto_general.sql
 supabase/migrations/0014_inversiones_fase_1.sql
 supabase/migrations/0015_cartera.sql
+supabase/migrations/0016_telegram.sql
+supabase/migrations/0017_proyeccion_depto.sql
 ```
 
 Verificá: `select count(*) from categorias;` → 17.
