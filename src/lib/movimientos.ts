@@ -1,3 +1,4 @@
+import { resolverCobroEnPesos } from "@/lib/cobroEnPesos";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Movimiento } from "./gemini";
 import { detectarDuplicado } from "./duplicados";
@@ -60,8 +61,10 @@ export async function guardarMovimiento(
   usuarioId: string,
   fotoPath: string | null = null
 ) {
+  const cobroEnPesos = resolverCobroEnPesos(item);
+  if (cobroEnPesos) item = cobroEnPesos.item;
   const categoria = await resolverCategoria(supabase, item, usuarioId);
-  const tcUsado = await obtenerUltimoTC(supabase);
+  const tcUsado = cobroEnPesos?.tcUsado ?? (await obtenerUltimoTC(supabase));
 
   const cuotasTotal = Math.max(1, Math.floor(item.cuotas) || 1);
   const montoArsTotal = item.moneda === "ARS" ? item.monto : tcUsado ? Number((item.monto * tcUsado).toFixed(2)) : item.monto;
@@ -74,9 +77,11 @@ export async function guardarMovimiento(
     item.comercio,
     item.descripcion
   );
-  const montoUsdTotal = item.moneda === "ARS"
-    ? (tcUsado ? Number((item.monto / tcUsado).toFixed(2)) : null)
-    : item.monto;
+  const montoUsdTotal = cobroEnPesos
+    ? cobroEnPesos.montoUsd
+    : item.moneda === "ARS"
+      ? (tcUsado ? Number((item.monto / tcUsado).toFixed(2)) : null)
+      : item.monto;
 
   const montoArsCuota = Number((montoArsTotal / cuotasTotal).toFixed(2));
   const montoUsdCuota = montoUsdTotal !== null ? Number((montoUsdTotal / cuotasTotal).toFixed(2)) : null;
