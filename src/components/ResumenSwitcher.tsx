@@ -61,6 +61,8 @@ export function ResumenSwitcher({
   const inicioToque = useRef<{ x: number; y: number } | null>(null);
 
   function alEmpezarToque(e: TouchEvent) {
+    // Si el gesto arranca en un área con scroll horizontal propio (gráfico del año), no cambia de período.
+    if ((e.target as HTMLElement).closest(".overflow-x-auto")) return;
     const toque = e.touches[0];
     inicioToque.current = { x: toque.clientX, y: toque.clientY };
   }
