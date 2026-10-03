@@ -2,6 +2,8 @@ export type Movimiento = {
   tipo: "gasto" | "ingreso";
   monto: number;
   moneda: "ARS" | "USD";
+  // Pesos que realmente entraron cuando el cobro se pactó en USD. 0/ausente si no lo dicen.
+  monto_ars_recibido?: number;
   descripcion: string;
   comercio: string | null;
   categoria: string;
@@ -115,6 +117,8 @@ Categorías válidas para tipo=gasto (usá EXACTAMENTE uno de estos nombres): ${
 Categorías válidas para tipo=ingreso (usá EXACTAMENTE uno de estos nombres): ${categorias.ingreso.join(", ")}
 Si dice "cobré", "me pagaron" o menciona el pago de un proyecto o cliente, usá tipo "ingreso" y categoría "Clientes" siempre que esa categoría esté en la lista.
 
+Cobros en dólares transferidos en pesos: si dicen el valor en dólares pero aclaran cuántos pesos les transfirieron o acreditaron ("cobré 500 dólares, me transfirieron 725 mil pesos"), poné monto=500, moneda "USD" y monto_ars_recibido=725000. Transcribí solo lo que dijeron, no conviertas ni calcules. Si no mencionan pesos recibidos, poné monto_ars_recibido en 0.
+
 Si NO podés determinar el monto con confianza razonable, poné confianza "baja" y NO inventes un número (poné monto en 0).
 Guardá siempre en transcripcion_raw una transcripción fiel de lo que se dijo o del texto/ticket recibido.`;
 }
@@ -125,6 +129,7 @@ const MOVIMIENTO_SCHEMA = {
     tipo: { type: "STRING", enum: ["gasto", "ingreso"] },
     monto: { type: "NUMBER" },
     moneda: { type: "STRING", enum: ["ARS", "USD"] },
+    monto_ars_recibido: { type: "NUMBER" },
     descripcion: { type: "STRING" },
     comercio: { type: "STRING", nullable: true },
     categoria: { type: "STRING" },
