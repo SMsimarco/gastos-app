@@ -330,7 +330,7 @@ export async function redactarRespuestaDesdeHechos(input: {
   const prompt = `Redactá una respuesta breve en español rioplatense a la pregunta del usuario usando EXCLUSIVAMENTE los hechos JSON provistos.
 No calcules, no infieras y no agregues ningún número que no aparezca literalmente en los hechos. No recomiendes activos fuera de politica ni opines si son buenos o malos. Nunca sugieras vender el largo plazo porque subió o bajó.
 Si fuera_de_politica es true, explicá solamente que el ticker no está en el plan del usuario y que por eso no podés sugerirlo.
-Si la lista de sugerencias está vacía, decí que no hay una acción pendiente según el plan.
+${input.esSugerencia ? "Si la lista de sugerencias está vacía, decí que no hay una acción pendiente según el plan." : "Respondé solamente la consulta informativa; no hables de acciones pendientes."}
 ${input.esSugerencia ? `Terminá exactamente con esta línea, una sola vez: ${cierre}` : "No agregues un descargo financiero."}
 
 Pregunta: ${input.pregunta}
