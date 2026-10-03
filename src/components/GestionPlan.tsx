@@ -21,6 +21,7 @@ type ConfigPlan = {
   meses_emergencia: number;
   gasto_mensual_manual: number | null;
   minimo_compra_usd: number;
+  inflacion_mensual_pct: number | null;
 } | null;
 type DetalleReparto = Record<ClaveBolsillo, number> & {
   metaEmergenciaUsd: number;
@@ -266,6 +267,7 @@ export function GestionPlan({
             <label className="flex flex-col gap-1 text-xs text-muted">Meses de emergencia<input type="number" min="1" defaultValue={config.meses_emergencia} onBlur={(e) => guardarConfig({ meses_emergencia: Number(e.target.value) })} className="input-plan" /></label>
             <label className="flex flex-col gap-1 text-xs text-muted">Mínimo de compra (US$)<input type="number" min="1" defaultValue={config.minimo_compra_usd} onBlur={(e) => guardarConfig({ minimo_compra_usd: Number(e.target.value) })} className="input-plan" /></label>
             <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">Gasto mensual manual (si no hay 3 meses de datos)<input type="number" min="0" defaultValue={config.gasto_mensual_manual ?? ""} onBlur={(e) => guardarConfig({ gasto_mensual_manual: e.target.value ? Number(e.target.value) : null })} className="input-plan" /></label>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">Inflación mensual estimada (%)<input type="number" min="0" step="0.01" defaultValue={config.inflacion_mensual_pct ?? ""} onBlur={(e) => guardarConfig({ inflacion_mensual_pct: e.target.value ? Number(e.target.value) : null })} className="input-plan" /></label>
           </div>
         </section>
       )}

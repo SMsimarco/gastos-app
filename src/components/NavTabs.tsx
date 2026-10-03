@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { crearClienteBrowser } from "@/lib/supabase/client";
-import { IconMic, IconChart, IconList, IconLogout, IconWallet } from "@/components/icons";
+import { IconMic, IconChart, IconList, IconLogout, IconTrend, IconWallet } from "@/components/icons";
 
 const TABS = [
   { href: "/", label: "Hoy", Icon: IconMic },
   { href: "/resumen", label: "Resumen", Icon: IconChart },
   { href: "/plan", label: "Plan", Icon: IconWallet },
+  { href: "/cartera", label: "Cartera", Icon: IconTrend },
   { href: "/todos", label: "Todos", Icon: IconList },
 ];
 

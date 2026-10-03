@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor, crearClienteServicio } from "@/lib/supabase/server";
-import { extraerMovimientos, clasificarYExtraerTexto, type Movimiento } from "@/lib/gemini";
+import { extraerMovimientos, clasificarYExtraerAudio, clasificarYExtraerTexto, type Movimiento } from "@/lib/gemini";
 import { guardarMovimiento } from "@/lib/movimientos";
 import { chequearPresupuestoExcedido } from "@/lib/presupuestos";
 import { responderConsulta } from "@/lib/consultas";
@@ -8,6 +8,7 @@ import { enviarPush } from "@/lib/push";
 import { obtenerListasCategorias } from "@/lib/categorias";
 import { subirFotoTicket } from "@/lib/storage";
 import { generarRepartoParaIngreso, resumenRepartoTexto } from "@/lib/planData";
+import { registrarOperacion } from "@/lib/inversiones/carteraData";
 
 export async function POST(request: NextRequest) {
   const supabaseAuth = await crearClienteServidor();
@@ -48,11 +49,47 @@ export async function POST(request: NextRequest) {
 
   let movimientos: Movimiento[];
   try {
-    if (fuente === "texto" && texto) {
-      const resultado = await clasificarYExtraerTexto(texto, categorias);
+    if ((fuente === "texto" && texto) || (fuente === "audio" && base64Data && mimeType)) {
+      const resultado = fuente === "texto"
+        ? await clasificarYExtraerTexto(texto!, categorias)
+        : await clasificarYExtraerAudio(base64Data!, mimeType!, categorias);
       if (resultado.intencion === "consulta") {
         const respuesta = await responderConsulta(supabaseServicio, user.id, resultado.pregunta);
         return NextResponse.json({ tipo: "consulta", respuesta });
+      }
+      if (resultado.intencion === "operacion") {
+        const operacion = resultado.operacion;
+        if (
+          operacion.confianza === "baja" ||
+          !operacion.ticker ||
+          operacion.monto_usd <= 0 ||
+          (operacion.tipo !== "dividendo" && operacion.precio_usd <= 0)
+        ) {
+          return NextResponse.json({
+            tipo: "operacion",
+            guardado: false,
+            necesitaAclaracion: "Necesito ticker, monto total y precio para registrar la operación.",
+            operacion,
+          });
+        }
+        try {
+          const guardada = await registrarOperacion(supabaseServicio, user.id, {
+            ticker: operacion.ticker,
+            tipo: operacion.tipo,
+            fecha: operacion.fecha,
+            cantidad: operacion.cantidad || undefined,
+            precioUsd: operacion.precio_usd,
+            montoUsd: operacion.monto_usd,
+            comisionUsd: operacion.comision_usd,
+            nota: operacion.transcripcion_raw,
+          });
+          return NextResponse.json({ tipo: "operacion", guardado: true, operacion: guardada });
+        } catch (errorOperacion) {
+          return NextResponse.json(
+            { error: errorOperacion instanceof Error ? errorOperacion.message : "No pude registrar la operación" },
+            { status: 400 }
+          );
+        }
       }
       movimientos = resultado.movimientos;
     } else {

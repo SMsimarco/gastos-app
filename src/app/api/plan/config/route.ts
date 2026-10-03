@@ -5,6 +5,7 @@ const CAMPOS_EDITABLES = [
   "pct_gastos", "pct_largo_plazo", "pct_aprender", "emergencia_primero",
   "meses_emergencia", "gasto_mensual_manual", "minimo_compra_usd",
   "fecha_objetivo_depto", "monto_objetivo_depto_usd", "anios_transicion",
+  "inflacion_mensual_pct",
 ] as const;
 
 export async function PATCH(request: NextRequest) {
