@@ -57,10 +57,16 @@ export async function guardarMovimientosExtraidos(params: {
     }
 
     if (guardado.tipo === "ingreso" && guardado.categoriaNombre.toLocaleLowerCase("es-AR") === "clientes") {
-      repartoGenerado = await generarRepartoParaIngreso(supabase, usuarioId, guardado.id, guardado.monto_ars);
+      const cobroEnUsd = guardado.moneda_origen === "USD" && Number(guardado.monto_usd) > 0;
+      repartoGenerado = await generarRepartoParaIngreso(
+        supabase, usuarioId, guardado.id, guardado.monto_ars,
+        cobroEnUsd ? { montoUsd: Number(guardado.monto_usd) } : {}
+      );
       if (repartoGenerado) {
         await enviarPush(supabase, usuarioId, {
-          title: `Cobraste $${Math.round(guardado.monto_ars).toLocaleString("es-AR")}`,
+          title: cobroEnUsd
+            ? `Cobraste US$${Number(guardado.monto_usd).toLocaleString("es-AR")}`
+            : `Cobraste $${Math.round(guardado.monto_ars).toLocaleString("es-AR")}`,
           body: `${resumenRepartoTexto(repartoGenerado.detalle)}\nSugerencia según tu plan, no asesoramiento financiero.`,
         });
       }

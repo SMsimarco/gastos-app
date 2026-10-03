@@ -86,6 +86,27 @@ describe("calcularReparto", () => {
     expect(Math.round(asignadoUsd * 100) / 100).toBe(disponibleUsd);
   });
 
+  it("un cobro de US$500 convertido y repartido con el mismo MEP conserva los 500 dólares", () => {
+    const mep = 1_544;
+    const montoIngresoArs = Math.round(500 * mep * 100) / 100;
+    const gastoMensualArs = 200_000;
+    const resultado = calcularReparto({
+      montoIngresoArs,
+      saldos: { gastos: 260_000, emergencia: 209, porInvertir: 0 },
+      gastoMensualArs,
+      tcReferencia: mep,
+      config: configDefault,
+    });
+    const totalUsd =
+      resultado.emergencia +
+      resultado.largo_plazo +
+      resultado.aprender +
+      resultado.por_invertir +
+      resultado.gastos / mep;
+
+    expect(Math.abs(totalUsd - 500)).toBeLessThanOrEqual(0.01);
+  });
+
   it("rechaza porcentajes que no suman 100", () => {
     expect(() =>
       calcularReparto({

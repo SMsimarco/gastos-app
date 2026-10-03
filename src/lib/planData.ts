@@ -132,7 +132,8 @@ export async function generarRepartoParaIngreso(
   supabase: SupabaseClient,
   usuarioId: string,
   ingresoId: string | null,
-  montoIngresoArs: number
+  montoIngresoArs: number,
+  opciones: { montoUsd?: number | null } = {}
 ): Promise<RepartoRow | null> {
   if (ingresoId) {
     const { data: existente } = await supabase
@@ -143,7 +144,18 @@ export async function generarRepartoParaIngreso(
     if (existente) return existente as RepartoRow;
   }
 
-  const calculado = await calcularRepartoParaUsuario(supabase, usuarioId, montoIngresoArs);
+  // Cobro en USD: monto_ars del movimiento usa el dólar oficial, pero el reparto convierte
+  // con MEP. Se recalcula con MEP para que ida y vuelta usen la misma cotización y no se pierdan dólares.
+  let montoParaReparto = montoIngresoArs;
+  let tcParaReparto: number | undefined;
+  if (opciones.montoUsd && opciones.montoUsd > 0) {
+    const mep = await obtenerUltimoMep(supabase);
+    if (!mep) return null;
+    montoParaReparto = Math.round(opciones.montoUsd * mep * 100) / 100;
+    tcParaReparto = mep;
+  }
+
+  const calculado = await calcularRepartoParaUsuario(supabase, usuarioId, montoParaReparto, tcParaReparto);
   if (!calculado) return null;
 
   await supabase
@@ -157,7 +169,7 @@ export async function generarRepartoParaIngreso(
     .insert({
       usuario_id: usuarioId,
       ingreso_id: ingresoId,
-      monto_ars: montoIngresoArs,
+      monto_ars: montoParaReparto,
       tc_referencia: calculado.tcReferencia,
       detalle: calculado.detalle,
       estado: "pendiente",
