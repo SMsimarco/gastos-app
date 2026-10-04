@@ -12,7 +12,7 @@ import { calcularIndicadores } from "./indicadores";
 import { CONFIG_MONITOR_DEFAULT, detectarEventos } from "./monitor";
 import { recolectarNoticiasAlpaca, recolectarNoticiasGlobales, resumirNoticiasPendientes } from "./noticias";
 
-export type TareaLab = "monitor" | "noticias" | "gdelt" | "macro" | "fundamentales";
+export type TareaLab = "monitor" | "noticias" | "gdelt" | "macro" | "fundamentales" | "aprendizaje";
 
 // Cada corrida deja registro (también si falla): nunca se reintenta en loop, y el panel puede
 // avisar qué fuente no respondió.

@@ -68,6 +68,16 @@ select cron.schedule('lab-fundamentales', '15 23 * * 1-5', $job$
   );
 $job$);
 
+-- Aprendizaje diario: señales de hoy, estadísticas de eventos (se recalculan una vez por semana) y el
+-- diario de mercado escrito por IA. Después de fundamentales (23:30 UTC).
+select cron.schedule('lab-aprendizaje', '30 23 * * 1-5', $job$
+  select net.http_get(
+    url := 'https://gastosvoz.vercel.app/api/lab/aprendizaje',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
+    timeout_milliseconds := 58000
+  );
+$job$);
+
 -- Limpieza: precios intradía de más de 30 días y registros de ejecución de más de 60 días.
 select cron.schedule('lab-limpieza', '15 5 * * *', $job$
   delete from lab_precios where tipo = 'intradia' and ts < now() - interval '30 days';

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import type { FilaFundamentalPanel, FilaMacroPanel } from "@/lib/laboratorio/panel";
-import type { EventoCalendarioPanel, EventoMercadoPanel, NoticiaPanel, PanelEnVivo } from "@/lib/laboratorio/panelData";
+import { MIN_CASOS } from "@/lib/laboratorio/eventos";
+import type { EstadisticaUsable } from "@/lib/laboratorio/memoria";
+import type { DiarioPanel, EstadisticaPanel, EventoCalendarioPanel, EventoMercadoPanel, NoticiaPanel, PanelEnVivo } from "@/lib/laboratorio/panelData";
 
 const REFRESCO_MS = 60_000;
 
@@ -29,7 +31,7 @@ function fechaCorta(fecha: string) {
   return `${dia}/${mes}/${anio}`;
 }
 
-const NOMBRE_TAREA = { monitor: "Monitor", noticias: "Noticias (empresas y mercado)", gdelt: "Noticias GDELT", macro: "Macro, Argentina y calendario", fundamentales: "Fundamentales y SEC" } as const;
+const NOMBRE_TAREA = { monitor: "Monitor", noticias: "Noticias (empresas y mercado)", gdelt: "Noticias GDELT", macro: "Macro, Argentina y calendario", fundamentales: "Fundamentales y SEC", aprendizaje: "Aprendizaje diario" } as const;
 const NOMBRE_TEMA: Record<string, string> = {
   fed: "Fed",
   inflacion: "Inflación",
@@ -105,6 +107,46 @@ function FilaFundamental({ fila }: { fila: FilaFundamentalPanel }) {
         )}
         {fila.insiders && ` · directivos (90 días): ${fila.insiders.compras} compras y ${fila.insiders.ventas} ventas`}
       </p>
+    </div>
+  );
+}
+
+const TONO: Record<string, string> = { positivo: "mercado positivo", negativo: "mercado negativo", mixto: "mercado mixto", neutral: "mercado neutral" };
+
+function fechaLarga(fecha: string) {
+  return new Date(`${fecha}T12:00:00Z`).toLocaleDateString("es-AR", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" });
+}
+
+function EntradaDiario({ diario }: { diario: DiarioPanel }) {
+  return (
+    <div className="px-4 py-3">
+      <p className="text-xs text-muted">{fechaLarga(diario.fecha)} · {TONO[diario.tono] ?? diario.tono}</p>
+      <p className="mt-1 text-sm leading-relaxed">{diario.resumen}</p>
+      {diario.puntos_clave.length > 0 && (
+        <ul className="mt-2 list-disc pl-5 text-xs text-muted">
+          {diario.puntos_clave.map((punto) => <li key={punto}>{punto}</li>)}
+        </ul>
+      )}
+      {diario.a_mirar.length > 0 && <p className="mt-2 text-xs text-accent">A mirar: {diario.a_mirar.join(" · ")}</p>}
+    </div>
+  );
+}
+
+function textoEstadistica(horizonte: string, e: EstadisticaUsable | null) {
+  if (!e) return `${horizonte}: sin casos suficientes`;
+  return `${horizonte}: ${conSigno(e.media)} de media, sube ${numero.format(e.pctPositivo)}% de las veces, ${e.n} casos${e.origen === "universo" ? " (todo el universo)" : ""}, un día común da ${conSigno(e.mediaBase)}`;
+}
+
+function FilaEstadisticas({ filas }: { filas: EstadisticaPanel[] }) {
+  const celda = (fila: EstadisticaPanel | undefined) =>
+    !fila || fila.media === null ? "—" : `${conSigno(fila.media)} · sube ${numero.format(fila.pctPositivo ?? 0)}% · ${fila.n} casos${fila.n < MIN_CASOS ? " (pocos)" : ""}`;
+  const a5 = filas.find((fila) => fila.horizonte === 5);
+  const a20 = filas.find((fila) => fila.horizonte === 20);
+  return (
+    <div className="px-4 py-3">
+      <p className="text-sm font-medium">{(a5 ?? a20)?.etiqueta}</p>
+      <p className="mt-0.5 text-xs text-muted tabular-nums">A 5 ruedas: {celda(a5)} (día común {a5?.mediaBase === null || !a5 ? "—" : conSigno(a5.mediaBase)})</p>
+      <p className="text-xs text-muted tabular-nums">A 20 ruedas: {celda(a20)} (día común {a20?.mediaBase === null || !a20 ? "—" : conSigno(a20.mediaBase)})</p>
     </div>
   );
 }
@@ -232,6 +274,57 @@ export function PanelLaboratorio({ panelInicial }: { panelInicial: PanelEnVivo }
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Diario de mercado</h2>
+        <p className="-mt-1 text-xs text-muted">Una nota por rueda, escrita por IA solo con los datos recolectados. Es la memoria que van a leer los bots.</p>
+        {panel.aprendizaje.diario.length === 0 ? (
+          <p className="text-sm text-muted">Todavía no hay notas: se escribe una cada rueda después del cierre.</p>
+        ) : (
+          <div className="card divide-y divide-border-soft">
+            <EntradaDiario diario={panel.aprendizaje.diario[0]} />
+            {panel.aprendizaje.diario.slice(1).map((diario) => (
+              <details key={diario.fecha} className="group">
+                <summary className="cursor-pointer px-4 py-3 text-xs text-muted">{fechaLarga(diario.fecha)} · {TONO[diario.tono] ?? diario.tono}</summary>
+                <EntradaDiario diario={diario} />
+              </details>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Señales de hoy y lo que enseña la historia</h2>
+        {panel.aprendizaje.senales.length === 0 ? (
+          <p className="text-sm text-muted">Hoy no se activó ninguna señal técnica en el universo.</p>
+        ) : (
+          <ul className="card divide-y divide-border-soft">
+            {panel.aprendizaje.senales.map((senal) => (
+              <li key={`${senal.ticker}-${senal.evento}`} className="px-4 py-3">
+                <p className="text-sm font-medium">{senal.ticker} · {senal.etiqueta}</p>
+                <p className="mt-0.5 text-xs text-muted">{textoEstadistica("A 5 ruedas", senal.a5)}</p>
+                <p className="text-xs text-muted">{textoEstadistica("A 20 ruedas", senal.a20)}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Estadísticas de eventos</h2>
+        <p className="-mt-1 text-xs text-muted">
+          Qué hizo el precio después de cada evento, en todo el universo{panel.aprendizaje.historia ? `, entre ${fechaCorta(panel.aprendizaje.historia.desde)} y ${fechaCorta(panel.aprendizaje.historia.hasta)}` : ""}. Se mide desde el cierre del día del evento. Ojo: el universo son empresas grandes que hoy existen y vienen siendo de las ganadoras (sesgo de supervivencia), y los casos de días seguidos se superponen, así que esto exagera lo que pasaría en general. Leelo como contexto, no como promesa; con pocos casos no se saca ninguna conclusión.
+        </p>
+        {panel.aprendizaje.estadisticas.length === 0 ? (
+          <p className="text-sm text-muted">Todavía no se calcularon: se hace una vez por semana.</p>
+        ) : (
+          <div className="card divide-y divide-border-soft">
+            {[...new Set(panel.aprendizaje.estadisticas.map((fila) => fila.evento))].map((evento) => (
+              <FilaEstadisticas key={evento} filas={panel.aprendizaje.estadisticas.filter((fila) => fila.evento === evento)} />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">

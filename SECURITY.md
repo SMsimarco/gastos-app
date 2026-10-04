@@ -39,7 +39,7 @@ explícito.
 
 ## Laboratorio (`/api/lab/*`)
 
-`src/app/api/lab/{monitor,noticias,gdelt,macro,fundamentales}/route.ts` los llama `pg_cron` de Supabase con
+`src/app/api/lab/{monitor,noticias,gdelt,macro,fundamentales,aprendizaje}/route.ts` los llama `pg_cron` de Supabase con
 `Authorization: Bearer $LAB_CRON_SECRET` (comparación en tiempo constante, ver
 `src/lib/laboratorio/auth.ts`). Usan `crearClienteServicio` porque escriben tablas **globales** de
 datos de mercado (`lab_precios`, `lab_indicadores`, `lab_noticias`, `lab_macro`,
