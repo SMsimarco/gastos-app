@@ -12,6 +12,7 @@ vi.mock("./fuentes/alpaca", async (original) => ({
 vi.mock("./bots/reactivo", () => ({ leerContextoReactivo: vi.fn() }));
 vi.mock("./bots/ejecutar", () => ({ ejecutarDecisiones: vi.fn() }));
 vi.mock("./bots/avisos", () => ({ avisarDecisionPorEvento: vi.fn() }));
+vi.mock("./bots/snapshots", () => ({ guardarSnapshotsIntradia: vi.fn(async () => ({ bots: 0, benchmark: false, errores: [] })) }));
 
 import { avisarDecisionPorEvento } from "./bots/avisos";
 import { ejecutarDecisiones } from "./bots/ejecutar";

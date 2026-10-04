@@ -11,6 +11,7 @@ import { describirFiling } from "./fundamentales";
 import { avisarDecisionPorEvento } from "./bots/avisos";
 import { ejecutarDecisiones } from "./bots/ejecutar";
 import { leerContextoReactivo } from "./bots/reactivo";
+import { guardarSnapshotsIntradia } from "./bots/snapshots";
 import { calcularIndicadores } from "./indicadores";
 import { CONFIG_MONITOR_DEFAULT, detectarEventos } from "./monitor";
 import { recolectarNoticiasAlpaca, recolectarNoticiasGlobales, resumirNoticiasPendientes } from "./noticias";
@@ -56,6 +57,10 @@ export async function ejecutarMonitor(supabase: SupabaseClient) {
     );
     if (error) throw new Error(`No pude guardar los precios: ${error.message}`);
   }
+
+  // Valor de cada bot y del benchmark cada 15 minutos para el gráfico de "hoy". Nunca rompe al monitor.
+  const precioVoo = snapshots.find((snap) => snap.ticker === "VOO")?.precio ?? null;
+  const snapshotsBots = await guardarSnapshotsIntradia(supabase, precioVoo).catch((error) => ({ error: mensajeDeError(error) }));
 
   const precios: Record<string, number> = {};
   const referencias: Record<string, number> = {};
@@ -152,6 +157,7 @@ export async function ejecutarMonitor(supabase: SupabaseClient) {
     precios: snapshots.length,
     eventos: eventos.length,
     dispararian: eventos.filter((evento) => evento.disparaDecision).length,
+    snapshotsBots,
     ...(decisionPorEvento ? { decisionPorEvento } : {}),
   };
 }
