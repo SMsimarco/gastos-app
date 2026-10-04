@@ -6,6 +6,7 @@ import { eventosDeHoy, estudiarEventos } from "./eventos";
 import { obtenerBarrasDiarias } from "./fuentes/alpaca";
 import { mensajeDeError } from "./fuentes/http";
 import { llamarGeminiJson } from "./gemini";
+import { construirPromptLecciones, evaluarDecision, HORIZONTE_LECCION, LECCIONES_SCHEMA, normalizarLecciones, type CasoLeccion } from "./bots/lecciones";
 import type { Barra } from "./indicadores";
 import { resumirMacro, SERIES_PANEL, type FilaMacroPanel } from "./panel";
 import { costoLlamadaUsd, evaluarPresupuesto } from "./presupuesto";
@@ -191,6 +192,91 @@ async function generarDiario(
   }
 }
 
+// --- Lecciones de los bots (capa 3) ---
+
+type DecisionParaLeccion = { id: string; bot_id: string; usuario_id: string; ticker: string; accion: "comprar" | "vender"; monto_aprobado_usd: number; razon_ia: string | null; precio_ejecucion: number; created_at: string };
+
+// Para cada decisión ejecutada de un bot con perfil completo que ya cumplió su horizonte, el código mide el
+// resultado contra su precio de ejecución y contra VOO, y una llamada de IA por bot redacta las lecciones.
+async function generarLecciones(supabase: SupabaseClient, contexto: ContextoLab): Promise<{ estado: string; lecciones: number; costoUsd?: number; error?: string }> {
+  const { data: bots } = await supabase.from("lab_bots").select("id, perfil_info").eq("perfil_info", "completo");
+  const idsBots = (bots ?? []).map((bot) => bot.id as string);
+  if (idsBots.length === 0) return { estado: "sin_bots", lecciones: 0 };
+
+  const desde = new Date(Date.now() - 75 * 86_400_000).toISOString();
+  const { data: decisiones } = await supabase
+    .from("lab_decisiones")
+    .select("id, bot_id, usuario_id, ticker, accion, monto_aprobado_usd, razon_ia, precio_ejecucion, created_at")
+    .in("bot_id", idsBots)
+    .in("accion", ["comprar", "vender"])
+    .eq("estado_orden", "filled")
+    .not("precio_ejecucion", "is", null)
+    .gte("created_at", desde);
+  if (!decisiones || decisiones.length === 0) return { estado: "sin_decisiones", lecciones: 0 };
+
+  const { data: hechas } = await supabase.from("lab_lecciones").select("decision_id").in("decision_id", decisiones.map((fila) => fila.id as string)).eq("horizonte_ruedas", HORIZONTE_LECCION);
+  const yaHechas = new Set((hechas ?? []).map((fila) => fila.decision_id as string));
+  const pendientes = (decisiones as DecisionParaLeccion[]).filter((fila) => !yaHechas.has(fila.id));
+  if (pendientes.length === 0) return { estado: "sin_pendientes", lecciones: 0 };
+
+  const tickers = [...new Set([...pendientes.map((fila) => fila.ticker), "VOO"])];
+  const barras = await obtenerBarrasDiarias(tickers, 120);
+  const casosPorBot = new Map<string, Array<{ decision: DecisionParaLeccion; caso: CasoLeccion }>>();
+  for (const decision of pendientes) {
+    const fechaDecision = fechaNuevaYork(new Date(decision.created_at));
+    const evaluacion = evaluarDecision({ accion: decision.accion, precioEjecucion: Number(decision.precio_ejecucion), fechaDecision, barras: barras[decision.ticker] ?? [], barrasVoo: barras.VOO ?? [] });
+    if (!evaluacion) continue; // todavía no pasaron las 5 ruedas
+    const lista = casosPorBot.get(decision.bot_id) ?? [];
+    lista.push({ decision, caso: { ticker: decision.ticker, accion: decision.accion, fechaDecision, montoUsd: Number(decision.monto_aprobado_usd), razonOriginal: decision.razon_ia ?? "", horizonte: HORIZONTE_LECCION, evaluacion } });
+    casosPorBot.set(decision.bot_id, lista);
+  }
+  if (casosPorBot.size === 0) return { estado: "sin_vencidas", lecciones: 0 };
+
+  let creadas = 0;
+  let costoTotal = 0;
+  for (const [botId, lista] of casosPorBot) {
+    const casos = lista.slice(0, 5);
+    const prompt = construirPromptLecciones(casos.map((item) => item.caso));
+    const estimado = costoLlamadaUsd(contexto.modeloDecision, Math.ceil(prompt.length / 3), 1_500);
+    const presupuesto = evaluarPresupuesto({ gastadoMesUsd: await gastoDelMes(supabase), topeUsd: contexto.topeIaUsd, costoEstimadoUsd: estimado });
+    if (!presupuesto.permitido) return { estado: "sin_presupuesto", lecciones: creadas, costoUsd: costoTotal };
+    try {
+      const { data, tokensEntrada, tokensSalida } = await llamarGeminiJson<unknown>(contexto.modeloDecision, prompt, LECCIONES_SCHEMA);
+      const costoUsd = await registrarCostoIa(supabase, { tipo: "leccion_bot", modelo: contexto.modeloDecision, tokensEntrada, tokensSalida, detalle: { bot_id: botId, casos: casos.length } });
+      costoTotal += costoUsd;
+      const textos = normalizarLecciones(data, casos.length);
+      const filas = [...textos.entries()].map(([indice, leccion]) => {
+        const { decision, caso } = casos[indice];
+        return {
+          usuario_id: decision.usuario_id,
+          bot_id: botId,
+          decision_id: decision.id,
+          horizonte_ruedas: HORIZONTE_LECCION,
+          fecha_decision: caso.fechaDecision,
+          ticker: caso.ticker,
+          accion: caso.accion,
+          resultado_pct: caso.evaluacion.resultadoPct,
+          voo_pct: caso.evaluacion.vooPct,
+          exceso_pct: caso.evaluacion.excesoPct,
+          veredicto: caso.evaluacion.veredicto,
+          leccion,
+          modelo: contexto.modeloDecision,
+          costo_usd: Math.round((costoUsd / Math.max(1, textos.size)) * 1_000_000) / 1_000_000,
+        };
+      });
+      if (filas.length > 0) {
+        const { error } = await supabase.from("lab_lecciones").upsert(filas, { onConflict: "decision_id,horizonte_ruedas", ignoreDuplicates: true });
+        if (error) throw new Error(error.message);
+        creadas += filas.length;
+      }
+    } catch (error) {
+      // Sin reintentos en loop: las decisiones quedan pendientes y la próxima corrida diaria lo vuelve a intentar.
+      return { estado: "error", lecciones: creadas, costoUsd: costoTotal, error: mensajeDeError(error) };
+    }
+  }
+  return { estado: "ok", lecciones: creadas, costoUsd: costoTotal };
+}
+
 // --- Tarea diaria ---
 
 export async function ejecutarAprendizaje(supabase: SupabaseClient, opciones: OpcionesAprendizaje = {}) {
@@ -209,7 +295,8 @@ export async function ejecutarAprendizaje(supabase: SupabaseClient, opciones: Op
     actualizarEstadisticas(supabase, barras, Boolean(opciones.forzarEstadisticas)),
   ]);
   const [diario] = await Promise.allSettled([generarDiario(supabase, contexto, hoy, ultimaRueda, Boolean(opciones.forzarDiario))]);
+  const [lecciones] = await Promise.allSettled([generarLecciones(supabase, contexto)]);
   const comoDetalle = <T,>(resultado: PromiseSettledResult<T>) =>
     resultado.status === "fulfilled" ? resultado.value : { error: mensajeDeError(resultado.reason) };
-  return { ultimaRueda, senales: comoDetalle(senales), estadisticas: comoDetalle(estadisticas), diario: comoDetalle(diario) };
+  return { ultimaRueda, senales: comoDetalle(senales), estadisticas: comoDetalle(estadisticas), diario: comoDetalle(diario), lecciones: comoDetalle(lecciones) };
 }

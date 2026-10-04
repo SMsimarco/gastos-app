@@ -47,6 +47,7 @@ Reglas:
 - Los montos son en dólares. Respetá los "limites": el sistema los hace cumplir y recorta todo lo que se pase.
 - Las compras no pueden usar el efectivo de ventas del mismo día.
 - No hagas cuentas: los porcentajes, medias y rendimientos ya vienen calculados.
+- Si el briefing trae "lecciones", son de TUS decisiones pasadas: cada una es un solo caso de pocas ruedas y puede ser suerte. Usalas como contexto, nunca como reglas.
 - "razon": una o dos frases que citen los datos concretos del briefing en los que te basás.
 
 Devolvé "acciones" (lista de {ticker, accion: comprar|vender|mantener, monto_usd, razon, confianza: alta|media|baja}) y "resumen_mercado" (2 a 3 líneas sobre cómo ves el mercado hoy).

@@ -8,6 +8,9 @@ import { obtenerBalancesProgramados, obtenerInsiders, obtenerMetricas, obtenerRe
 import { obtenerFechasPublicacion, obtenerSerieFred, PUBLICACIONES_MACRO, SERIES_MACRO } from "./fuentes/fred";
 import { esperar, mensajeDeError } from "./fuentes/http";
 import { describirFiling } from "./fundamentales";
+import { avisarDecisionPorEvento } from "./bots/avisos";
+import { ejecutarDecisiones } from "./bots/ejecutar";
+import { leerContextoReactivo } from "./bots/reactivo";
 import { calcularIndicadores } from "./indicadores";
 import { CONFIG_MONITOR_DEFAULT, detectarEventos } from "./monitor";
 import { recolectarNoticiasAlpaca, recolectarNoticiasGlobales, resumirNoticiasPendientes } from "./noticias";
@@ -58,9 +61,14 @@ export async function ejecutarMonitor(supabase: SupabaseClient) {
   const referencias: Record<string, number> = {};
   for (const snap of snapshots) {
     precios[snap.ticker] = snap.precio;
-    // Mientras no haya bots, la referencia es el cierre anterior; en la parte B será el precio de la última decisión.
+    // Referencia del movimiento: el cierre anterior; si el bot reactivo ya decidió, el precio de su última decisión.
     if (snap.cierreAnterior) referencias[snap.ticker] = snap.cierreAnterior;
   }
+
+  // Bot reactivo (A): sus posiciones reales, los precios de su última decisión y cuántas decisiones por evento
+  // lleva hoy. Si no hay un bot reactivo activo, el monitor solo registra eventos como en la parte A.
+  const reactivo = await leerContextoReactivo(supabase, fechaMercado).catch(() => null);
+  const referenciasFinales = { ...referencias, ...(reactivo?.referencias ?? {}) };
 
   const [vixFilas, noticias, balancesHoy, claves, disparos] = await Promise.all([
     supabase.from("lab_macro").select("fecha, valor").eq("serie", "VIXCLS").order("fecha", { ascending: false }).limit(2),
@@ -91,7 +99,7 @@ export async function ejecutarMonitor(supabase: SupabaseClient) {
     fechaMercado,
     universo: contexto.universo,
     precios,
-    referencias,
+    referencias: referenciasFinales,
     vix,
     noticiasNuevas: (noticias.data ?? []).map((noticia) => ({
       id: noticia.id as string,
@@ -101,15 +109,17 @@ export async function ejecutarMonitor(supabase: SupabaseClient) {
       relevancia: noticia.relevancia === null ? null : Number(noticia.relevancia),
     })),
     tickersConBalanceHoy: (balancesHoy.data ?? []).map((fila) => fila.ticker as string),
-    posiciones: [], // todavía no hay bots (parte B)
+    posiciones: reactivo?.posiciones ?? [],
     clavesRegistradas: new Set((claves.data ?? []).map((fila) => fila.clave as string)),
-    disparosHoy: disparos.data?.length ?? 0,
-    ultimoDisparo: disparos.data?.[0] ? new Date(disparos.data[0].ts as string) : null,
-    config: { ...CONFIG_MONITOR_DEFAULT, ...contexto.monitor },
+    disparosHoy: reactivo ? reactivo.disparosHoy : (disparos.data?.length ?? 0),
+    ultimoDisparo: reactivo ? reactivo.ultimoDisparo : (disparos.data?.[0] ? new Date(disparos.data[0].ts as string) : null),
+    // El bot no reacciona antes de su decisión diaria (esa ya mira todo): hasta entonces no se despierta.
+    config: { ...CONFIG_MONITOR_DEFAULT, ...contexto.monitor, ...(reactivo && !reactivo.diariaHecha ? { maxDecisionesEventoPorDia: 0 } : {}) },
   });
 
+  const idsPorClave = new Map<string, string>();
   if (eventos.length > 0) {
-    const { error } = await supabase.from("lab_eventos_mercado").upsert(
+    const { data: nuevos, error } = await supabase.from("lab_eventos_mercado").upsert(
       eventos.map((evento) => ({
         ts: ahora.toISOString(),
         clave: evento.clave,
@@ -119,11 +129,31 @@ export async function ejecutarMonitor(supabase: SupabaseClient) {
         disparo_decision: evento.disparaDecision,
       })),
       { onConflict: "clave", ignoreDuplicates: true }
-    );
+    ).select("id, clave");
     if (error) throw new Error(`No pude guardar los eventos: ${error.message}`);
+    for (const fila of nuevos ?? []) idsPorClave.set(fila.clave as string, fila.id as string);
   }
 
-  return { precios: snapshots.length, eventos: eventos.length, dispararian: eventos.filter((evento) => evento.disparaDecision).length };
+  // Decisión del bot reactivo ante el primer evento que lo despierta (como mucho una por corrida del monitor).
+  let decisionPorEvento: Record<string, unknown> | null = null;
+  const disparador = eventos.find((evento) => evento.disparaDecision);
+  if (reactivo && disparador) {
+    const eventoBot = { tipo: disparador.tipo, ticker: disparador.ticker, detalle: disparador.detalle };
+    const resultado = await ejecutarDecisiones(supabase, { disparador: "evento", clave: reactivo.bot.clave, evento: { id: idsPorClave.get(disparador.clave) ?? null, ...eventoBot } });
+    const delBot = resultado.bots?.find((bot) => bot.clave === reactivo.bot.clave);
+    let aviso: string | null = null;
+    if (delBot) {
+      aviso = await avisarDecisionPorEvento(supabase, { usuarioId: reactivo.bot.usuario_id, botClave: reactivo.bot.clave, corridaId: delBot.corridaId, estado: delBot.estado, evento: eventoBot }).catch(() => "error");
+    }
+    decisionPorEvento = { evento: disparador.clave, resultado, aviso };
+  }
+
+  return {
+    precios: snapshots.length,
+    eventos: eventos.length,
+    dispararian: eventos.filter((evento) => evento.disparaDecision).length,
+    ...(decisionPorEvento ? { decisionPorEvento } : {}),
+  };
 }
 
 // --- Noticias (cada 30 min) ---

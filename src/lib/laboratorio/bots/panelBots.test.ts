@@ -63,4 +63,23 @@ describe("armarPanelBots", () => {
     expect(panel.bots.find((bot) => bot.clave === "C")?.ultimaCorrida).toMatchObject({ estado: "error", error: "Gemini falló: 503", decisiones: [] });
     expect(panel.bots.find((bot) => bot.clave === "B")?.ultimaCorrida).toBeNull();
   });
+
+  it("muestra las últimas 3 lecciones de cada bot y no mezcla las de otro", () => {
+    const leccion = (bot_id: string, dia: number) => ({ bot_id, fecha_decision: `2026-10-0${dia}`, ticker: "NVDA", accion: "comprar", resultado_pct: 6, voo_pct: 2, veredicto: "acerto", leccion: `Lección ${dia} de ${bot_id}` });
+    const panel = armarPanelBots({
+      config: { activo: true, fecha_inicio: "2026-10-01", capital_inicial_usd: 1_000 },
+      bots,
+      snapshots: [],
+      corridas: [],
+      decisiones: [],
+      lecciones: [leccion("a", 5), leccion("a", 4), leccion("a", 3), leccion("a", 2), leccion("b", 4)],
+      hoy: "2026-10-09",
+    });
+    const botA = panel.bots.find((bot) => bot.clave === "A")!;
+    expect(botA.lecciones.map((l) => l.leccion)).toEqual(["Lección 5 de a", "Lección 4 de a", "Lección 3 de a"]);
+    expect(botA.lecciones[0]).toMatchObject({ ticker: "NVDA", resultadoPct: 6, vooPct: 2, veredicto: "acerto" });
+    expect(panel.bots.find((bot) => bot.clave === "B")?.lecciones).toHaveLength(1);
+    expect(panel.bots.find((bot) => bot.clave === "C")?.lecciones).toEqual([]);
+  });
 });
+

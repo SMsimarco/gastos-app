@@ -49,10 +49,10 @@ export async function leerIndicadoresUniverso(supabase: SupabaseClient, universo
 }
 
 // Todo lo que reciben los bots con perfil completo: noticias, macro, fundamentales, calendario, diario y señales.
-export async function leerDatosCompletos(supabase: SupabaseClient, universo: string[], hoy: string): Promise<DatosCompletos> {
+export async function leerDatosCompletos(supabase: SupabaseClient, universo: string[], hoy: string, botId?: string): Promise<DatosCompletos> {
   const ahora = Date.now();
   const empresas = universo.filter((ticker) => !ETFS_UNIVERSO.has(ticker));
-  const [noticias, macro, filings, calendario, diario, senales, estadisticas, fundamentales, analistas, sorpresas, insiders] = await Promise.all([
+  const [noticias, macro, filings, calendario, diario, senales, estadisticas, fundamentales, analistas, sorpresas, insiders, lecciones] = await Promise.all([
     supabase
       .from("lab_noticias")
       .select("resumen, titular, sentimiento, relevancia, tickers, tema")
@@ -70,6 +70,10 @@ export async function leerDatosCompletos(supabase: SupabaseClient, universo: str
     supabase.from("lab_analistas").select("ticker, periodo, strong_buy, buy, hold, sell, strong_sell").in("ticker", empresas).order("periodo", { ascending: false }).limit(empresas.length * 4),
     supabase.from("lab_sorpresas").select("ticker, periodo, sorpresa_pct").in("ticker", empresas).order("periodo", { ascending: false }).limit(empresas.length * 4),
     supabase.from("lab_insiders").select("ticker, codigo, fecha_transaccion, cambio_acciones").in("ticker", empresas).gte("fecha_transaccion", sumarDias(hoy, -90)).limit(2000),
+    // Cada bot aprende solo de sus propias decisiones.
+    botId
+      ? supabase.from("lab_lecciones").select("fecha_decision, ticker, leccion").eq("bot_id", botId).order("creada_at", { ascending: false }).limit(5)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const recientes = sumarDias(hoy, -4);
@@ -127,6 +131,6 @@ export async function leerDatosCompletos(supabase: SupabaseClient, universo: str
       (senales.data ?? []).filter((fila) => fila.fecha === fechaSenales).map((fila) => ({ ticker: fila.ticker as string, evento: fila.evento as string })),
       filasEstadisticas
     ),
-    lecciones: [], // la capa 3 (lecciones de los bots) llega en la parte B2
+    lecciones: (lecciones.data ?? []).map((fila) => ({ fecha: fila.fecha_decision as string, ticker: (fila.ticker as string | null) ?? null, leccion: fila.leccion as string })),
   };
 }

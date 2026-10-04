@@ -13,6 +13,8 @@ export type DecisionBotPanel = {
   precioEjecucion: number | null;
 };
 
+export type LeccionPanel = { fecha: string; ticker: string; accion: string; resultadoPct: number; vooPct: number | null; veredicto: string; leccion: string };
+
 export type BotPanel = {
   clave: string;
   nombre: string;
@@ -24,6 +26,7 @@ export type BotPanel = {
   efectivoUsd: number | null;
   rendimientoPct: number | null;
   costoIaUsd: number;
+  lecciones: LeccionPanel[];
   posiciones: Array<{ ticker: string; valorUsd: number; resultadoPct: number | null }>;
   ultimaCorrida: { ts: string; estado: string; disparador: string; modelo: string | null; resumenMercado: string; error: string | null; decisiones: DecisionBotPanel[] } | null;
 };
@@ -41,6 +44,7 @@ export type LaboratorioBotsPanel = {
 type FilaBot = { id: string; clave: string; nombre: string; perfil_info: string; reactivo: boolean; pausado: boolean; motivo_pausa: string | null };
 type FilaSnapshot = { bot_id: string | null; ts: string; valor_usd: number; efectivo_usd: number | null; costo_ia_acumulado_usd: number; posiciones: Array<{ ticker: string; valor_usd: number; resultado_pct?: number | null }> };
 type FilaCorrida = { id: string; bot_id: string; ts: string; estado: string; disparador: string; modelo: string | null; error: string | null; respuesta_ia: { resumen_mercado?: string } | null };
+type FilaLeccion = { bot_id: string; fecha_decision: string; ticker: string; accion: string; resultado_pct: number; voo_pct: number | null; veredicto: string; leccion: string };
 type FilaDecision = { corrida_id: string; ticker: string; accion: string; monto_propuesto_usd: number; monto_aprobado_usd: number; razon_ia: string | null; ajuste_riesgo: string | null; estado_orden: string; precio_ejecucion: number | null };
 
 const redondear = (valor: number) => Math.round(valor * 100) / 100;
@@ -52,6 +56,7 @@ export function armarPanelBots(params: {
   snapshots: FilaSnapshot[];
   corridas: FilaCorrida[];
   decisiones: FilaDecision[];
+  lecciones?: FilaLeccion[];
   hoy: string;
 }): LaboratorioBotsPanel {
   const capital = Number(params.config?.capital_inicial_usd ?? 1_000);
@@ -74,6 +79,10 @@ export function armarPanelBots(params: {
         efectivoUsd: snapshot?.efectivo_usd === null || snapshot?.efectivo_usd === undefined ? null : Number(snapshot.efectivo_usd),
         rendimientoPct: snapshot ? rendimiento(Number(snapshot.valor_usd)) : null,
         costoIaUsd: snapshot ? Number(snapshot.costo_ia_acumulado_usd) : 0,
+        lecciones: (params.lecciones ?? [])
+          .filter((fila) => fila.bot_id === bot.id)
+          .slice(0, 3)
+          .map((fila) => ({ fecha: fila.fecha_decision, ticker: fila.ticker, accion: fila.accion, resultadoPct: Number(fila.resultado_pct), vooPct: fila.voo_pct === null ? null : Number(fila.voo_pct), veredicto: fila.veredicto, leccion: fila.leccion })),
         posiciones: (snapshot?.posiciones ?? []).map((posicion) => ({ ticker: posicion.ticker, valorUsd: Number(posicion.valor_usd), resultadoPct: posicion.resultado_pct ?? null })),
         ultimaCorrida: corrida
           ? {
