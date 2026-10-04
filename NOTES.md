@@ -118,7 +118,6 @@ Experimento SIMULADO (plata ficticia), aislado del plan real: tablas `lab_*`, si
 Limitaciones a tener presentes:
 - **GDELT quedó pausado (2026-10-04).** Se probó desde la red de desarrollo y desde Vercel (con el cron corriendo solo): casi siempre devuelve HTTP 429 ("Please limit requests to one every 5 seconds") aun con 6-15 s de separación, o `fetch failed` por timeout de conexión, y una sola vez un `{}` sin resultados. Nunca se vio una respuesta real con artículos, así que el parser solo está probado con respuestas armadas a mano. Las noticias globales salen ahora del flujo general de Alpaca. El endpoint `/api/lab/gdelt` y su cliente siguen en el código; para reactivarlo hay que activar el job `lab-gdelt` (`select cron.alter_job(<jobid>, active := true);`)
 - **VIX intradía:** FRED publica `VIXCLS` con un día de retraso y Alpaca no tiene el índice. El evento "VIX +10% en el día" se calcula contra la rueda anterior con el último dato de FRED, una vez por fecha. Si más adelante se consigue una fuente intradía, solo cambia lo que recibe `monitor.ts`.
-- **Fundamentales (P/E, crecimiento, margen):** no entran en la parte A (no estaban en las tablas pedidas). Finnhub los tiene gratis; quedan para la parte B si los bots los necesitan.
 - **Posiciones de bots:** todavía no existen, así que los eventos que dependen de tener posición (noticia relevante, balance de hoy) se registran pero no "disparan decisión". La referencia del movimiento de 3% es el cierre anterior hasta que haya decisiones.
 - **Modelos:** el resumen de noticias usa `gemini-3.5-flash-lite` (existe en la API y es el más barato; configurable en `lab_config.modelo_resumen`). Las decisiones de los bots (parte B) usarán `modelo_decision` (default `gemini-3.6-flash`). Precios en `presupuesto.ts`, verificados en https://ai.google.dev/gemini-api/docs/pricing: flash-lite US$0,30 entrada / US$2,50 salida por millón de tokens; 3.6 flash US$0,75 / US$3,75; 3.5 flash US$1,50 / US$9,00. Un modelo desconocido se cobra al precio más caro conocido.
 
@@ -150,3 +149,28 @@ Es una estimación gruesa: lo real se mide en la tabla `lab_costos_ia` (cada lla
 - Los endpoints leen la configuración de todos los usuarios con `service_role`: universo = unión de los universos, tope = el más chico. Con un solo usuario es simplemente su configuración.
 - El resumen de noticias usa solo el titular (más tema y tickers de la fuente): alcanza para sentimiento y relevancia y ahorra tokens.
 - Los números de las noticias (sentimiento, relevancia) los produce la IA; el resto (indicadores, variaciones, eventos) se calcula en TypeScript con tests.
+
+## Fuentes adicionales (2026-10-04, migración 0019)
+
+Se probó cada candidata con las keys reales antes de elegir. Todo lo de la tabla es gratis y no usa IA.
+
+| Fuente | Qué se guarda | Tabla | Frecuencia | Límite / condición |
+|---|---|---|---|---|
+| Finnhub `stock/metric` | P/E, P/S, márgenes, crecimiento de ingresos y EPS, ROE, deuda/capital, beta, rango de 52 semanas, rendimiento a 13/26/52 semanas, dividendo, capitalización | `lab_fundamentales` (jsonb por ticker y día) | diaria | ~60 llamadas/min compartidas con el resto de Finnhub; 4 llamadas por empresa (11 empresas = 44) en lotes de 4 |
+| Finnhub `stock/recommendation` | Recomendaciones de analistas (strong buy / buy / hold / sell / strong sell) por mes | `lab_analistas` | diaria | Finnhub a veces repite un período (XOM): se deduplica |
+| Finnhub `stock/earnings` | Estimado vs real de los últimos 4 balances y % de sorpresa | `lab_sorpresas` | diaria | |
+| Finnhub `stock/insider-transactions` | Compras (P) y ventas (S) de directivos de los últimos 90 días; se descartan premios, impuestos y regalos | `lab_insiders` | diaria | |
+| SEC EDGAR `submissions` | Presentaciones 8-K, 6-K, 10-Q, 10-K, 20-F y 40-F de los últimos 45 días, con los ítems del 8-K traducidos (Resultados trimestrales, Cambios en directivos, etc.) y link | `lab_filings` | diaria | Sin key, exige `SEC_USER_AGENT` con un contacto; máx. 10 pedidos/s (se espacian 200 ms). Los Form 4 y 144 se filtran porque ya están en Finnhub |
+| FRED (6 series nuevas) | Bono a 10 y 2 años, spread de crédito high yield, pedidos semanales de desempleo, confianza del consumidor (Michigan), índice dólar | `lab_macro` | diaria | Misma key |
+| FRED `release/dates` | Próximas publicaciones de CPI, empleo, PBI, PPI, PCE y ventas minoristas (ids verificados) | `lab_eventos_calendario` (tipo `macro`) | diaria | |
+| argentinadatos.com | Riesgo país | `lab_macro` (`RIESGO_PAIS`) | diaria | Sin key. Bloquea clientes tipo Python; con `fetch` de Node anda |
+| dolarapi.com | Dólar oficial, MEP, CCL y blue (precio de venta, con la fecha de actualización de cada casa) | `lab_macro` (`USD_*`) | diaria | Sin key. Solo da el valor actual: la variación aparece desde el segundo día |
+| Alpaca `corporate-actions` | Próximos dividendos en efectivo del universo (fecha ex y de pago) | `lab_eventos_calendario` (tipo `dividendo`) | diaria | Misma key |
+
+Los ETF (VOO, QQQ, VTI, SCHD) no tienen métricas, analistas ni insiders en Finnhub: solo entran precios, indicadores y dividendos.
+
+Descartadas, con la prueba: Finnhub calendario económico, precio objetivo y sentimiento social (HTTP 403, plan pago); BCRA API v3 (HTTP 410, deprecada); Reddit y StockTwits (piden aprobación u OAuth); movers y most-actives de Alpaca (casi solo penny stocks, sin valor para este universo); Finnhub `company-news` como segunda fuente de noticias por empresa (respondió, pero duplica la cobertura de Alpaca y cada titular nuevo cuesta IA).
+
+Programación: el endpoint `/api/lab/fundamentales` corre a las 23:15 UTC de lunes a viernes (después de `macro`, 22:30). Impacto en la parte B: todo esto va solo al briefing de los bots con perfil `completo` (A y B), nunca al C, y el briefing tendrá un tope de tamaño para no inflar tokens por decisión.
+
+Verificación de punta a punta (con las keys reales y una base descartable, migraciones 0018 y 0019 aplicadas en orden sobre datos existentes): `macro` 386 observaciones, 17 publicaciones macro y 3 dividendos; `fundamentales` 11 empresas, 43 recomendaciones, 44 sorpresas, 179 movimientos de directivos únicos y 18 filings; repetir las corridas no duplica nada. La prueba encontró que Finnhub repite períodos (XOM) y que el mensaje de error de la base se perdía; ambos corregidos con tests.

@@ -22,6 +22,7 @@ PERMITIDOS=(
   "src/app/api/lab/noticias/route.ts"
   "src/app/api/lab/macro/route.ts"
   "src/app/api/lab/gdelt/route.ts"
+  "src/app/api/lab/fundamentales/route.ts"
 )
 
 ENCONTRADOS=$(grep -rl "crearClienteServicio" src --include="*.ts" --include="*.tsx" | grep -v "/api/cron/" || true)

@@ -153,3 +153,23 @@ export async function obtenerNoticias(tickers: string[], desde: Date, maxPaginas
 export async function obtenerNoticiasGenerales(desde: Date, maxPaginas = 3): Promise<NoticiaCruda[]> {
   return obtenerNoticias([], desde, maxPaginas);
 }
+
+// --- Dividendos ---
+
+export type Dividendo = { ticker: string; fechaEx: string; fechaPago: string | null; monto: number; especial: boolean };
+
+type DividendoAlpaca = { symbol?: string; ex_date?: string; payable_date?: string; rate?: number; special?: boolean };
+
+export function parsearDividendos(filas: DividendoAlpaca[]): Dividendo[] {
+  return filas.flatMap((fila) => {
+    if (!fila.symbol || !fila.ex_date || typeof fila.rate !== "number" || !(fila.rate > 0)) return [];
+    return [{ ticker: fila.symbol.toUpperCase(), fechaEx: fila.ex_date, fechaPago: fila.payable_date ?? null, monto: fila.rate, especial: Boolean(fila.special) }];
+  });
+}
+
+// Próximos dividendos en efectivo del universo (fecha ex entre `desde` y `hasta`, YYYY-MM-DD).
+export async function obtenerDividendos(tickers: string[], desde: string, hasta: string): Promise<Dividendo[]> {
+  const params = new URLSearchParams({ symbols: tickers.join(","), types: "cash_dividend", start: desde, end: hasta, limit: "100" });
+  const data = await pedir<{ corporate_actions?: { cash_dividends?: DividendoAlpaca[] } }>(`${DATA_URL}/v1/corporate-actions?${params}`);
+  return parsearDividendos(data.corporate_actions?.cash_dividends ?? []);
+}
