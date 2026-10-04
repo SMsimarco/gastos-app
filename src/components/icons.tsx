@@ -172,3 +172,12 @@ export function IconGoogle({ className, size = 24 }: IconProps) {
     </svg>
   );
 }
+
+export function IconFlask({ className, size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2.2h12.4a1.5 1.5 0 0 0 1.3-2.2L14 9V3" />
+      <path d="M7.5 15h9" />
+    </svg>
+  );
+}

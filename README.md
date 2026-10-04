@@ -24,6 +24,7 @@ Registro de gastos e ingresos por voz, texto o foto. Le hablás, le escribís, l
 - **Cartera y rendimiento** — registra compras de activos por formulario, texto o voz, calcula costo promedio, valor, ganancia y comparación contra VOO. También estima el rendimiento nominal y real de las cuentas remuneradas.
 - **Consultas sobre tu plan** — preguntás por voz o texto cuánto rinde un activo, cuánto falta para una meta o qué acción corresponde según tus propias reglas. Los cálculos salen del código y Gemini solo redacta con esos datos; cualquier sugerencia queda limitada a los activos de tu política.
 - **Proyección del depto** — estima un rango pesimista, base y optimista con el ahorro real de seis meses y muestra cuánto acorta el plazo cada palanca: más proyectos, mejor precio, menos gasto o mayor rendimiento.
+- **Laboratorio (simulado)** — pestaña "Lab" con un panel en vivo de lo que van a ver los bots de inversión simulados: precios del universo con RSI y tendencia, VIX y macro, noticias de todo el mundo resumidas con sentimiento y relevancia, calendario de balances y reuniones de la Fed, y el feed de eventos del monitor. Es un experimento con plata ficticia, aislado del plan real (tablas `lab_*`). Por ahora solo recolecta datos; los bots llegan en las próximas partes.
 - **PWA instalable con notificaciones push** — funciona como app nativa en el celular, con cola offline (si capturás sin señal, se sube sola cuando vuelve la conexión) y avisos nativos del navegador sin depender de apps de terceros.
 - **Auto-registro por email (opcional)** — conectás tu Gmail una vez (solo lectura) y cada gasto que hagas con Mercado Pago (u otra billetera que configures) se registra solo, leyendo el mail de confirmación con el mismo Gemini que interpreta un mensaje de texto.
 
@@ -154,6 +155,11 @@ TELEGRAM_WEBHOOK_SECRET=
 TWELVE_DATA_API_KEY=
 GOOGLE_GMAIL_CLIENT_ID=
 GOOGLE_GMAIL_CLIENT_SECRET=
+ALPACA_API_KEY_ID=
+ALPACA_API_SECRET_KEY=
+FRED_API_KEY=
+FINNHUB_API_KEY=
+LAB_CRON_SECRET=
 ```
 
 ### 8. Correr local
@@ -178,6 +184,18 @@ El bot `@investfoco_bot` recibe texto y audio con el mismo flujo de captura que 
 Después de desplegar, registrar el webhook HTTPS con `setWebhook` apuntando a `https://gastosvoz.vercel.app/api/telegram/webhook`, enviando el mismo valor de `TELEGRAM_WEBHOOK_SECRET` en `secret_token` y limitando `allowed_updates` a `message` y `callback_query`. El servidor verifica el header `X-Telegram-Bot-Api-Secret-Token` en cada entrega.
 
 Los avisos de mercado se ejecutan después de actualizar precios y se deduplican por usuario y fecha. El resumen semanal se envía los domingos a las 20:00 de Argentina. Todos los avisos financieros incluyen el aviso de que son sugerencias según el plan y no asesoramiento financiero.
+
+### 11. Laboratorio (simulado)
+
+Datos de mercado para el experimento de bots simulados. Todo es gratis y no mueve plata.
+
+1. **Alpaca** — creá una cuenta en [alpaca.markets](https://alpaca.markets) y generá las keys de *paper trading*: `ALPACA_API_KEY_ID` y `ALPACA_API_SECRET_KEY`. Se usan para los precios (feed IEX del plan gratuito), las noticias por empresa y el reloj del mercado. Más adelante hacen falta las keys de las 3 cuentas paper de los bots.
+2. **FRED** — key gratis en [fred.stlouisfed.org](https://fred.stlouisfed.org/docs/api/api_key.html): `FRED_API_KEY` (VIX, tasa de la Fed, inflación, desempleo, curva de tasas, petróleo).
+3. **Finnhub** — key gratis en [finnhub.io](https://finnhub.io): `FINNHUB_API_KEY` (calendario de balances).
+4. **`LAB_CRON_SECRET`** — `openssl rand -hex 32`. Cargalo en Vercel y en `scripts/lab-pg-cron.sql`.
+5. Aplicá la migración `0018_laboratorio_datos.sql` y ejecutá `scripts/lab-pg-cron.sql` en el SQL Editor de Supabase. Vercel Hobby solo permite crons diarios, así que la frecuencia de 15 y 30 minutos la maneja Supabase con `pg_cron` + `pg_net` (ver `NOTES.md`, Fase 6A).
+
+Para probar a mano: `curl -H "Authorization: Bearer $LAB_CRON_SECRET" https://gastosvoz.vercel.app/api/lab/macro` (primero `macro`, que carga indicadores y calendario; después `noticias`, `gdelt` y `monitor`).
 
 ---
 
