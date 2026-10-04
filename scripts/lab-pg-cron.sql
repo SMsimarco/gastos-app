@@ -58,6 +58,16 @@ select cron.schedule('lab-macro', '30 22 * * 1-5', $job$
   );
 $job$);
 
+-- Fundamentales, analistas, sorpresas, insiders (Finnhub) y presentaciones de la SEC: una vez por día,
+-- después de la tarea macro (23:15 UTC).
+select cron.schedule('lab-fundamentales', '15 23 * * 1-5', $job$
+  select net.http_get(
+    url := 'https://gastosvoz.vercel.app/api/lab/fundamentales',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
+    timeout_milliseconds := 58000
+  );
+$job$);
+
 -- Limpieza: precios intradía de más de 30 días y registros de ejecución de más de 60 días.
 select cron.schedule('lab-limpieza', '15 5 * * *', $job$
   delete from lab_precios where tipo = 'intradia' and ts < now() - interval '30 days';

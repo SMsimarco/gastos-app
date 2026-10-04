@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { EventoMercadoPanel, NoticiaPanel, PanelEnVivo } from "@/lib/laboratorio/panelData";
+import type { FilaFundamentalPanel, FilaMacroPanel } from "@/lib/laboratorio/panel";
+import type { EventoCalendarioPanel, EventoMercadoPanel, NoticiaPanel, PanelEnVivo } from "@/lib/laboratorio/panelData";
 
 const REFRESCO_MS = 60_000;
 
@@ -28,7 +29,7 @@ function fechaCorta(fecha: string) {
   return `${dia}/${mes}/${anio}`;
 }
 
-const NOMBRE_TAREA = { monitor: "Monitor", noticias: "Noticias (empresas y mercado)", gdelt: "Noticias GDELT", macro: "Macro y calendario" } as const;
+const NOMBRE_TAREA = { monitor: "Monitor", noticias: "Noticias (empresas y mercado)", gdelt: "Noticias GDELT", macro: "Macro, Argentina y calendario", fundamentales: "Fundamentales y SEC" } as const;
 const NOMBRE_TEMA: Record<string, string> = {
   fed: "Fed",
   inflacion: "Inflación",
@@ -38,6 +39,75 @@ const NOMBRE_TEMA: Record<string, string> = {
   elecciones_eeuu: "Elecciones EE.UU.",
   argentina: "Argentina",
 };
+
+function valorConUnidad(fila: FilaMacroPanel): string {
+  const valor = numero.format(fila.valor);
+  if (fila.unidad === "%") return `${valor}%`;
+  if (fila.unidad === "$") return `$${valor}`;
+  if (fila.unidad === "US$") return `US$${valor}`;
+  if (fila.unidad === "pb") return `${valor} pb`;
+  return valor;
+}
+
+function etiquetaCalendario(evento: EventoCalendarioPanel): string {
+  switch (evento.tipo) {
+    case "fed":
+      return "Reunión de la Fed (tasas)";
+    case "macro":
+      return String(evento.detalle.descripcion ?? "Publicación macro");
+    case "dividendo":
+      return `Dividendo de ${evento.ticker}: US$${numero.format(Number(evento.detalle.monto))} (fecha ex)`;
+    default:
+      return `Balance de ${evento.ticker}`;
+  }
+}
+
+function TablaMacro({ filas, vacio }: { filas: FilaMacroPanel[]; vacio: string }) {
+  if (filas.length === 0) return <p className="text-sm text-muted">{vacio}</p>;
+  return (
+    <div className="card divide-y divide-border-soft">
+      {filas.map((fila) => (
+        <div key={fila.serie} className="flex items-center justify-between gap-3 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium">{fila.nombre}</p>
+            <p className="text-xs text-muted">al {fechaCorta(fila.fecha)}</p>
+          </div>
+          <div className="text-right">
+            <p className="font-medium tabular-nums">{valorConUnidad(fila)}</p>
+            <p className={`text-xs tabular-nums ${fila.tipoVariacion === "interanual" ? "text-muted" : colorVariacion(fila.variacion)}`}>
+              {fila.tipoVariacion === "interanual"
+                ? `${conSigno(fila.variacion)} interanual`
+                : conSigno(fila.variacion, fila.tipoVariacion === "pct" ? "%" : fila.unidad === "pb" ? " pb" : " pp")}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FilaFundamental({ fila }: { fila: FilaFundamentalPanel }) {
+  const valor = (n: number | null, sufijo = "") => (n === null ? "—" : `${numero.format(n)}${sufijo}`);
+  return (
+    <div className="px-4 py-3">
+      <p className="font-semibold">{fila.ticker}</p>
+      <p className="text-xs text-muted tabular-nums">
+        P/E {valor(fila.pe)} · margen neto {valor(fila.margenNeto, "%")} · ingresos {fila.crecimientoIngresos === null ? "—" : conSigno(fila.crecimientoIngresos)} · beta {valor(fila.beta)}
+      </p>
+      <p className="mt-0.5 text-xs text-muted">
+        {fila.analistas ? `${fila.analistas.compra} de ${fila.analistas.total} analistas recomiendan comprar` : "sin recomendaciones de analistas"}
+        {fila.sorpresa && (
+          <>
+            {" · último balance "}
+            <span className={colorVariacion(fila.sorpresa.pct)}>{conSigno(fila.sorpresa.pct)}</span>
+            {" contra lo esperado"}
+          </>
+        )}
+        {fila.insiders && ` · directivos (90 días): ${fila.insiders.compras} compras y ${fila.insiders.ventas} ventas`}
+      </p>
+    </div>
+  );
+}
 
 function describirEvento(evento: EventoMercadoPanel): string {
   const d = evento.detalle;
@@ -165,29 +235,26 @@ export function PanelLaboratorio({ panelInicial }: { panelInicial: PanelEnVivo }
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">VIX y macro</h2>
-        {panel.macro.length === 0 ? (
-          <p className="text-sm text-muted">Sin datos macro todavía.</p>
+        <h2 className="text-lg font-semibold">Fundamentales y analistas</h2>
+        {panel.fundamentales.every((fila) => fila.fechaDatos === null) ? (
+          <p className="text-sm text-muted">Sin fundamentales todavía: se cargan una vez por día después del cierre.</p>
         ) : (
           <div className="card divide-y divide-border-soft">
-            {panel.macro.map((fila) => (
-              <div key={fila.serie} className="flex items-center justify-between gap-3 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">{fila.nombre}</p>
-                  <p className="text-xs text-muted">al {fechaCorta(fila.fecha)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium tabular-nums">{numero.format(fila.valor)}{fila.unidad === "%" ? "%" : ""}</p>
-                  <p className={`text-xs tabular-nums ${fila.tipoVariacion === "interanual" ? "text-muted" : colorVariacion(fila.variacion)}`}>
-                    {fila.tipoVariacion === "interanual"
-                      ? `${conSigno(fila.variacion)} interanual`
-                      : conSigno(fila.variacion, fila.tipoVariacion === "pct" ? "%" : " pp")}
-                  </p>
-                </div>
-              </div>
+            {panel.fundamentales.map((fila) => (
+              <FilaFundamental key={fila.ticker} fila={fila} />
             ))}
           </div>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">VIX y macro de EE.UU.</h2>
+        <TablaMacro filas={panel.macro.filter((fila) => fila.grupo === "eeuu")} vacio="Sin datos macro todavía." />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Argentina</h2>
+        <TablaMacro filas={panel.macro.filter((fila) => fila.grupo === "argentina")} vacio="Sin datos de Argentina todavía." />
       </section>
 
       <section className="flex flex-col gap-3">
@@ -204,14 +271,32 @@ export function PanelLaboratorio({ panelInicial }: { panelInicial: PanelEnVivo }
       </section>
 
       <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Hechos materiales (SEC)</h2>
+        {panel.filings.length === 0 ? (
+          <p className="text-sm text-muted">Sin presentaciones recientes todavía.</p>
+        ) : (
+          <ul className="card divide-y divide-border-soft">
+            {panel.filings.map((filing) => (
+              <li key={filing.id} className="px-4 py-3 text-sm">
+                <a href={filing.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:text-accent">
+                  {filing.ticker} · {filing.descripcion ?? filing.formulario}
+                </a>
+                <p className="mt-0.5 text-xs text-muted">{filing.formulario} · {fechaCorta(filing.fecha)}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Calendario</h2>
         {panel.calendario.length === 0 ? (
-          <p className="text-sm text-muted">Sin balances ni reuniones de la Fed próximos.</p>
+          <p className="text-sm text-muted">Sin balances, publicaciones macro ni dividendos próximos.</p>
         ) : (
           <ul className="card divide-y divide-border-soft">
             {panel.calendario.map((evento) => (
               <li key={evento.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                <span>{evento.tipo === "fed" ? "Reunión de la Fed (tasas)" : `Balance de ${evento.ticker}`}</span>
+                <span>{etiquetaCalendario(evento)}</span>
                 <span className="tabular-nums text-muted">{fechaCorta(evento.fecha)}</span>
               </li>
             ))}
@@ -239,7 +324,7 @@ export function PanelLaboratorio({ panelInicial }: { panelInicial: PanelEnVivo }
         )}
       </section>
 
-      <p className="text-center text-xs text-muted">Datos de Alpaca (IEX), GDELT, FRED y Finnhub. Experimento simulado, no es asesoramiento financiero.</p>
+      <p className="text-center text-xs text-muted">Datos de Alpaca (IEX), FRED, Finnhub, SEC EDGAR, argentinadatos y dolarapi. Experimento simulado, no es asesoramiento financiero.</p>
     </div>
   );
 }

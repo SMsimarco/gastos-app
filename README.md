@@ -24,7 +24,7 @@ Registro de gastos e ingresos por voz, texto o foto. Le hablás, le escribís, l
 - **Cartera y rendimiento** — registra compras de activos por formulario, texto o voz, calcula costo promedio, valor, ganancia y comparación contra VOO. También estima el rendimiento nominal y real de las cuentas remuneradas.
 - **Consultas sobre tu plan** — preguntás por voz o texto cuánto rinde un activo, cuánto falta para una meta o qué acción corresponde según tus propias reglas. Los cálculos salen del código y Gemini solo redacta con esos datos; cualquier sugerencia queda limitada a los activos de tu política.
 - **Proyección del depto** — estima un rango pesimista, base y optimista con el ahorro real de seis meses y muestra cuánto acorta el plazo cada palanca: más proyectos, mejor precio, menos gasto o mayor rendimiento.
-- **Laboratorio (simulado)** — pestaña "Lab" con un panel en vivo de lo que van a ver los bots de inversión simulados: precios del universo con RSI y tendencia, VIX y macro, noticias de todo el mundo resumidas con sentimiento y relevancia, calendario de balances y reuniones de la Fed, y el feed de eventos del monitor. Es un experimento con plata ficticia, aislado del plan real (tablas `lab_*`). Por ahora solo recolecta datos; los bots llegan en las próximas partes.
+- **Laboratorio (simulado)** — pestaña "Lab" con un panel en vivo de lo que van a ver los bots de inversión simulados: precios del universo con RSI y tendencia, fundamentales, recomendaciones de analistas y movimientos de directivos, VIX y macro de EE.UU., riesgo país y dólares de Argentina, hechos materiales de la SEC, noticias de todo el mundo resumidas con sentimiento y relevancia, calendario de balances y reuniones de la Fed, y el feed de eventos del monitor. Es un experimento con plata ficticia, aislado del plan real (tablas `lab_*`). Por ahora solo recolecta datos; los bots llegan en las próximas partes.
 - **PWA instalable con notificaciones push** — funciona como app nativa en el celular, con cola offline (si capturás sin señal, se sube sola cuando vuelve la conexión) y avisos nativos del navegador sin depender de apps de terceros.
 - **Auto-registro por email (opcional)** — conectás tu Gmail una vez (solo lectura) y cada gasto que hagas con Mercado Pago (u otra billetera que configures) se registra solo, leyendo el mail de confirmación con el mismo Gemini que interpreta un mensaje de texto.
 
@@ -160,6 +160,7 @@ ALPACA_API_SECRET_KEY=
 FRED_API_KEY=
 FINNHUB_API_KEY=
 LAB_CRON_SECRET=
+SEC_USER_AGENT=
 ```
 
 ### 8. Correr local
@@ -193,9 +194,10 @@ Datos de mercado para el experimento de bots simulados. Todo es gratis y no muev
 2. **FRED** — key gratis en [fred.stlouisfed.org](https://fred.stlouisfed.org/docs/api/api_key.html): `FRED_API_KEY` (VIX, tasa de la Fed, inflación, desempleo, curva de tasas, petróleo).
 3. **Finnhub** — key gratis en [finnhub.io](https://finnhub.io): `FINNHUB_API_KEY` (calendario de balances).
 4. **`LAB_CRON_SECRET`** — `openssl rand -hex 32`. Cargalo en Vercel y en `scripts/lab-pg-cron.sql`.
-5. Aplicá la migración `0018_laboratorio_datos.sql` y ejecutá `scripts/lab-pg-cron.sql` en el SQL Editor de Supabase. Vercel Hobby solo permite crons diarios, así que la frecuencia de 15 y 30 minutos la maneja Supabase con `pg_cron` + `pg_net` (ver `NOTES.md`, Fase 6A).
+5. **`SEC_USER_AGENT`** — la SEC exige identificarse: `gastos-app tu-mail@ejemplo.com`. Sin key. Las demás fuentes nuevas (argentinadatos, dolarapi) tampoco piden key.
+6. Aplicá las migraciones `0018_laboratorio_datos.sql` y `0019_laboratorio_fuentes.sql` y ejecutá `scripts/lab-pg-cron.sql` en el SQL Editor de Supabase. Vercel Hobby solo permite crons diarios, así que la frecuencia de 15 y 30 minutos la maneja Supabase con `pg_cron` + `pg_net` (ver `NOTES.md`, Fase 6A).
 
-Para probar a mano: `curl -H "Authorization: Bearer $LAB_CRON_SECRET" https://gastosvoz.vercel.app/api/lab/macro` (primero `macro`, que carga indicadores y calendario; después `noticias` y `monitor`; `gdelt` está pausado).
+Para probar a mano: `curl -H "Authorization: Bearer $LAB_CRON_SECRET" https://gastosvoz.vercel.app/api/lab/macro` (primero `macro`, que carga indicadores, macro, Argentina y calendario; después `fundamentales`, `noticias` y `monitor`; `gdelt` está pausado).
 
 ---
 

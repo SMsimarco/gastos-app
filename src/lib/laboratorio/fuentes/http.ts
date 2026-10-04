@@ -9,5 +9,6 @@ export async function esperar(ms: number): Promise<void> {
 }
 
 export function mensajeDeError(error: unknown): string {
+  if (typeof error === "string" && error) return error;
   return error instanceof Error ? error.message : "Error desconocido";
 }

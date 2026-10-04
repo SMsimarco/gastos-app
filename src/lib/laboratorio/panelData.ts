@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { UNIVERSO_DEFAULT, fechaNuevaYork } from "./config";
-import { SERIES_MACRO } from "./fuentes/fred";
+import { ETFS_UNIVERSO, UNIVERSO_DEFAULT, fechaNuevaYork } from "./config";
 import {
+  armarFundamentales,
   resumirMacro,
+  SERIES_PANEL,
   ultimaEjecucionPorTarea,
   variacionDelDia,
   type EstadoFuente,
+  type FilaFundamentalPanel,
   type FilaIndicadoresPanel,
   type FilaMacroPanel,
 } from "./panel";
@@ -35,7 +37,9 @@ export type NoticiaPanel = {
   relevancia: number | null;
 };
 
-export type EventoCalendarioPanel = { id: string; tipo: "balance" | "fed"; ticker: string | null; fecha: string; detalle: Record<string, unknown> };
+export type EventoCalendarioPanel = { id: string; tipo: "balance" | "fed" | "macro" | "dividendo"; ticker: string | null; fecha: string; detalle: Record<string, unknown> };
+
+export type FilingPanel = { id: string; ticker: string; fecha: string; formulario: string; descripcion: string | null; url: string };
 
 export type EventoMercadoPanel = {
   id: string;
@@ -51,6 +55,8 @@ export type PanelEnVivo = {
   universo: string[];
   precios: FilaPrecioPanel[];
   macro: FilaMacroPanel[];
+  fundamentales: FilaFundamentalPanel[];
+  filings: FilingPanel[];
   noticias: NoticiaPanel[];
   calendario: EventoCalendarioPanel[];
   eventos: EventoMercadoPanel[];
@@ -70,9 +76,11 @@ async function obtenerUniverso(supabase: SupabaseClient, usuarioId: string): Pro
 export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: string): Promise<PanelEnVivo> {
   const universo = await obtenerUniverso(supabase, usuarioId);
   const hoy = fechaNuevaYork(new Date());
-  const idsMacro = SERIES_MACRO.map((serie) => serie.id);
+  const idsMacro = SERIES_PANEL.map((serie) => serie.id);
+  const empresas = universo.filter((ticker) => !ETFS_UNIVERSO.has(ticker));
+  const hace90Dias = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
 
-  const [precios, indicadores, macro, noticias, calendario, eventos, ejecuciones] = await Promise.all([
+  const [precios, indicadores, macro, noticias, calendario, eventos, ejecuciones, fundamentales, analistas, sorpresas, insiders, filings] = await Promise.all([
     supabase.from("lab_precios").select("ticker, ts, precio").eq("tipo", "intradia").in("ticker", universo).order("ts", { ascending: false }).limit(universo.length * 40),
     supabase.from("lab_indicadores").select("ticker, fecha, datos").in("ticker", universo).order("fecha", { ascending: false }).limit(universo.length * 2),
     // Una consulta por serie: con un solo límite global, las series diarias desplazan a las mensuales (CPI, desempleo).
@@ -87,6 +95,11 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
     supabase.from("lab_eventos_calendario").select("id, tipo, ticker, fecha, detalle").gte("fecha", hoy).order("fecha", { ascending: true }).limit(25),
     supabase.from("lab_eventos_mercado").select("id, ts, tipo, ticker, detalle, disparo_decision").order("ts", { ascending: false }).limit(30),
     supabase.from("lab_ejecuciones").select("tarea, ts, ok, error").order("ts", { ascending: false }).limit(60),
+    supabase.from("lab_fundamentales").select("ticker, fecha, datos").in("ticker", empresas).order("fecha", { ascending: false }).limit(empresas.length * 3),
+    supabase.from("lab_analistas").select("ticker, periodo, strong_buy, buy, hold, sell, strong_sell").in("ticker", empresas).order("periodo", { ascending: false }).limit(empresas.length * 4),
+    supabase.from("lab_sorpresas").select("ticker, periodo, sorpresa_pct").in("ticker", empresas).order("periodo", { ascending: false }).limit(empresas.length * 4),
+    supabase.from("lab_insiders").select("ticker, codigo, fecha_transaccion, cambio_acciones").in("ticker", empresas).gte("fecha_transaccion", hace90Dias).limit(2000),
+    supabase.from("lab_filings").select("id, ticker, fecha, formulario, descripcion, url").order("fecha", { ascending: false }).limit(15),
   ]);
 
   // Último precio intradía y última fila de indicadores de cada ticker.
@@ -130,6 +143,20 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
     universo,
     precios: filasPrecios,
     macro: filasMacro,
+    fundamentales: armarFundamentales({
+      empresas,
+      fundamentales: (fundamentales.data ?? []) as Array<{ ticker: string; fecha: string; datos: Record<string, number | null> }>,
+      analistas: (analistas.data ?? []) as Array<{ ticker: string; periodo: string; strong_buy: number; buy: number; hold: number; sell: number; strong_sell: number }>,
+      sorpresas: (sorpresas.data ?? []).map((fila) => ({ ticker: fila.ticker as string, periodo: fila.periodo as string, sorpresa_pct: fila.sorpresa_pct === null ? null : Number(fila.sorpresa_pct) })),
+      insiders: (insiders.data ?? []).map((fila) => ({
+        ticker: fila.ticker as string,
+        codigo: fila.codigo as string,
+        fecha_transaccion: fila.fecha_transaccion as string,
+        cambio_acciones: Number(fila.cambio_acciones),
+      })),
+      hoy,
+    }),
+    filings: (filings.data ?? []) as FilingPanel[],
     noticias: (noticias.data ?? []).map((fila) => ({
       id: fila.id as string,
       titular: fila.titular as string,
