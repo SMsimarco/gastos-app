@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ETFS_UNIVERSO, fechaNuevaYork, leerContextoLab } from "./config";
-import { obtenerBarrasDiarias, obtenerDividendos, obtenerReloj, obtenerSnapshots } from "./fuentes/alpaca";
+import { dividendosFuturos, obtenerBarrasDiarias, obtenerDividendos, obtenerReloj, obtenerSnapshots } from "./fuentes/alpaca";
 import { obtenerDolares, obtenerRiesgoPais } from "./fuentes/argentina";
 import { obtenerFilings, obtenerMapaCik } from "./fuentes/edgar";
 import { reunionesFedEntre } from "./fuentes/fed";
@@ -261,9 +261,10 @@ async function guardarCalendario(supabase: SupabaseClient, universo: string[], h
   let dividendos = 0;
   try {
     const hastaDividendos = new Date(Date.parse(`${hoy}T00:00:00Z`) + 90 * 24 * HORAS).toISOString().slice(0, 10);
-    const filas = await obtenerDividendos(universo, hoy, hastaDividendos);
+    const filas = dividendosFuturos(await obtenerDividendos(universo, hoy, hastaDividendos), hoy);
     const unicos = new Map(filas.map((dividendo) => [`${dividendo.ticker}:${dividendo.fechaEx}`, dividendo]));
-    await supabase.from("lab_eventos_calendario").delete().eq("tipo", "dividendo").gte("fecha", hoy);
+    // Se reemplaza el conjunto completo (también limpia los ya pasados): no puede quedar una fila vieja que choque.
+    await supabase.from("lab_eventos_calendario").delete().eq("tipo", "dividendo");
     if (unicos.size > 0) {
       const { error } = await supabase.from("lab_eventos_calendario").insert(
         [...unicos.values()].map((dividendo) => ({
