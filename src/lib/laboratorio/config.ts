@@ -53,6 +53,14 @@ export async function leerContextoLab(supabase: SupabaseClient): Promise<Context
   };
 }
 
+// Minutos desde la medianoche en hora de Nueva York (para ventanas horarias que siguen el cambio de horario).
+export function minutosNuevaYork(fecha: Date): number {
+  const partes = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(fecha);
+  const horas = Number(partes.find((parte) => parte.type === "hour")?.value ?? 0);
+  const minutos = Number(partes.find((parte) => parte.type === "minute")?.value ?? 0);
+  return horas * 60 + minutos;
+}
+
 // Fecha YYYY-MM-DD en hora de Nueva York (para claves de eventos y comparar contra la rueda).
 export function fechaNuevaYork(fecha: Date): string {
   return fecha.toLocaleDateString("en-CA", { timeZone: "America/New_York" });

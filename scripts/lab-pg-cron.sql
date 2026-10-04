@@ -78,6 +78,41 @@ select cron.schedule('lab-aprendizaje', '30 23 * * 1-5', $job$
   );
 $job$);
 
+-- Decisión diaria de los bots (paper trading): una hora después de la apertura (10:30 de Nueva York).
+-- Se programa en tres horarios UTC porque el cambio de horario de EE.UU. mueve la apertura 1 hora: el
+-- endpoint solo actúa con el mercado abierto y entre las 10:15 y las 12:30 de Nueva York, y es idempotente
+-- (una decisión por bot y por día), así que los horarios sobrantes no hacen nada y sirven de reintento.
+select cron.schedule('lab-decidir-1', '30 14 * * 1-5', $job$
+  select net.http_get(
+    url := 'https://gastosvoz.vercel.app/api/lab/decidir',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
+    timeout_milliseconds := 58000
+  );
+$job$);
+select cron.schedule('lab-decidir-2', '30 15 * * 1-5', $job$
+  select net.http_get(
+    url := 'https://gastosvoz.vercel.app/api/lab/decidir',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
+    timeout_milliseconds := 58000
+  );
+$job$);
+select cron.schedule('lab-decidir-3', '30 16 * * 1-5', $job$
+  select net.http_get(
+    url := 'https://gastosvoz.vercel.app/api/lab/decidir',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
+    timeout_milliseconds := 58000
+  );
+$job$);
+
+-- Cierre del día: valor de cada bot y del benchmark VOO, y conciliación de órdenes (después del cierre en verano e invierno).
+select cron.schedule('lab-cierre', '10 22 * * 1-5', $job$
+  select net.http_get(
+    url := 'https://gastosvoz.vercel.app/api/lab/cierre',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
+    timeout_milliseconds := 58000
+  );
+$job$);
+
 -- Limpieza: precios intradía de más de 30 días y registros de ejecución de más de 60 días.
 select cron.schedule('lab-limpieza', '15 5 * * *', $job$
   delete from lab_precios where tipo = 'intradia' and ts < now() - interval '30 days';

@@ -196,3 +196,29 @@ El laboratorio acumula memoria todos los días. Un modelo de IA no se entrena so
 
 **Verificación de punta a punta** (APIs reales, Gemini real y una base descartable con las migraciones 0018 a 0020 en orden): 384 filas de estadísticas con hasta 2.083 casos por evento, 2 señales de la última rueda (GOOGL cruzó su media de 200 días, QQQ marcó nuevo máximo anual) ligadas a su estadística, y un diario coherente con los datos. Un usuario puede leer todo con RLS pero no escribir en `lab_diario`. La primera corrida mostró un 503 de Gemini por alta demanda, de ahí el modelo alternativo.
 
+## Bots simulados, parte B1 (2026-10-05, migración 0021)
+
+Tres bots con US$1.000 ficticios cada uno en su propia cuenta paper de Alpaca (A, B y C; las keys van en `ALPACA_BOT_*`, nunca en la base). Responden las tres preguntas del experimento: A vs. B (¿reaccionar durante el día sirve?), B vs. C (¿más información mejora las decisiones?) y todos vs. un VOO virtual comprado el día 1 y nunca tocado. Esta parte B1 es el núcleo; la B2 suma las decisiones por evento del bot A, el aviso por Telegram y las lecciones.
+
+| Bot | Información | Cuándo decide |
+|---|---|---|
+| A | Todo (precios, noticias, macro, fundamentales, calendario, diario, señales con su estadística) | Una vez por día (+ ante eventos, en la B2) |
+| B | Todo | Una vez por día |
+| C | **Solo** portafolio, límites e indicadores técnicos. Un test verifica que nunca recibe noticias, macro, fundamentales, calendario, diario, señales ni lecciones, aunque vengan en la entrada | Una vez por día |
+
+**La IA propone y el código dispone.**
+- `riesgo.ts` (puro, 24 tests): descarta tickers fuera del universo; recorta compras al máximo por posición (20%) y para conservar el efectivo mínimo (10%); corta en 3 operaciones por día priorizando por confianza; no deja vender lo que no hay (una venta de casi todo cierra la posición); y con un drawdown del 25% no aprueba compras y pausa el bot. Las compras **no usan el efectivo de ventas de la misma corrida** (en una cuenta real todavía no liquidó): rotar tarda un día. Cada recorte o descarte deja su motivo.
+- **Solo paper:** `alpacaPaper.ts` valida en cada pedido que la URL sea exactamente `https://paper-api.alpaca.markets` (rechaza api.alpaca.markets, http, dominios parecidos, puertos y trucos con `usuario@`, todo con tests). No existe modo real ni flag para activarlo.
+- **Un modelo para los tres:** `gemini-3.5-flash`. En la prueba del 2026-10-04 fue el único que respondió 3 de 3 (3.6: 2 de 3, 3.8: 1 de 3, 3.7: 0 de 3 con 503; el 3.1 Pro dio 429 sin cupo). Además el precio de los 3.6 a 3.8 se duplica el 2027-01-01 (de US$0,75/3,75 a 1,50/7,50 por millón), así que la diferencia de costo es chica. Si la IA falla ese día, el bot **no opera** (no se cambia a un modelo más débil: ensuciaría la comparación) y la ventana horaria del cron reintenta.
+- **Decisión diaria:** a las 10:30 de Nueva York (una hora después de la apertura), con tres horarios UTC en el cron (el cambio de horario de EE.UU. mueve la apertura) y una ventana de 10:15 a 12:30 en el endpoint; es idempotente (una decisión por bot y por día). Órdenes a mercado por monto (fraccionarias), válidas por el día; las que no se ejecutan enseguida se concilian en el cierre.
+- **Registro completo:** `lab_corridas` guarda exactamente el briefing que vio la IA, su respuesta, el modelo, los tokens y el costo; `lab_decisiones` guarda lo propuesto, lo aprobado, lo que recortó el gestor y por qué, y la orden de Alpaca con su precio de ejecución. También quedan las decisiones de "no hacer nada".
+- **Cierre del día** (22:10 UTC): `lab_snapshots` guarda el valor de cada bot (con sus posiciones) y del benchmark VOO, concilia órdenes y calcula el costo de IA acumulado de cada bot: lo propio más una parte igual del costo compartido de noticias y diario, que solo pagan los bots que los usan (el C no).
+- **Arrancan en pausa:** desde la pestaña Lab, "Activar laboratorio" crea los bots (si faltan), marca la fecha de inicio de los 6 meses y los despausa; el benchmark VOO se "compra" la primera vez que corre una decisión. También se pueden pausar de a uno o todos juntos.
+- **Presupuesto:** con el tope mensual alcanzado el bot no llama a la IA (`sin_presupuesto`); los gastos de noticias, diario y bots se suman en `lab_costos_ia`.
+
+**Briefing con tope de tamaño** (28.000 caracteres, ~8.000 tokens): si se pasa, recorta de a poco primero lo que menos pesa (lecciones, presentaciones de la SEC, calendario, noticias, diario, señales, macro y al final fundamentales) y deja constancia de qué recortó. Nunca toca el portafolio ni los indicadores.
+
+**Costo medido** (decisiones simuladas con Gemini real el 2026-10-05): A US$0,0231, B US$0,0249 y C US$0,0238 por decisión. El C no sale más barato de lo que se esperaba: su briefing es 2,7 veces más chico (4.200 caracteres contra 11.400) pero casi todo el costo es el "pensamiento" del modelo (2.239 tokens de salida del C contra 1.721 y 1.919 del A y el B). Con 3 bots y ~22 ruedas por mes son unos US$1,6 por mes, más lo que sumen los eventos del A en la B2.
+
+**Verificación de punta a punta** (APIs reales, Gemini real y una base descartable con las migraciones 0018 a 0021): decisión simulada de los 3 bots en 11 segundos con sus cuentas reales de Alpaca; una orden real de US$1 en la cuenta C que Alpaca aceptó y se canceló, dejando la cuenta intacta; el cierre guarda un snapshot por bot sin duplicar al repetirse; el panel funciona con RLS (otro usuario no ve ni puede pausar tus bots). Sin verificar: una corrida real con órdenes ejecutadas (requiere el mercado abierto; cubierta por tests con Alpaca simulado) y la conciliación de una orden ejecutada.
+

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { FilaFundamentalPanel, FilaMacroPanel } from "@/lib/laboratorio/panel";
 import { MIN_CASOS } from "@/lib/laboratorio/eventos";
 import type { EstadisticaUsable } from "@/lib/laboratorio/memoria";
+import type { BotPanel, LaboratorioBotsPanel } from "@/lib/laboratorio/bots/panelBots";
 import type { DiarioPanel, EstadisticaPanel, EventoCalendarioPanel, EventoMercadoPanel, NoticiaPanel, PanelEnVivo } from "@/lib/laboratorio/panelData";
 
 const REFRESCO_MS = 60_000;
@@ -31,7 +32,7 @@ function fechaCorta(fecha: string) {
   return `${dia}/${mes}/${anio}`;
 }
 
-const NOMBRE_TAREA = { monitor: "Monitor", noticias: "Noticias (empresas y mercado)", gdelt: "Noticias GDELT", macro: "Macro, Argentina y calendario", fundamentales: "Fundamentales y SEC", aprendizaje: "Aprendizaje diario" } as const;
+const NOMBRE_TAREA = { monitor: "Monitor", noticias: "Noticias (empresas y mercado)", gdelt: "Noticias GDELT", macro: "Macro, Argentina y calendario", fundamentales: "Fundamentales y SEC", aprendizaje: "Aprendizaje diario", decidir: "Decisión de los bots", cierre: "Cierre del día" } as const;
 const NOMBRE_TEMA: Record<string, string> = {
   fed: "Fed",
   inflacion: "Inflación",
@@ -108,6 +109,130 @@ function FilaFundamental({ fila }: { fila: FilaFundamentalPanel }) {
         {fila.insiders && ` · directivos (90 días): ${fila.insiders.compras} compras y ${fila.insiders.ventas} ventas`}
       </p>
     </div>
+  );
+}
+
+const ACCION_TEXTO: Record<string, string> = { comprar: "Compró", vender: "Vendió", mantener: "Mantuvo" };
+
+async function cambiar(url: string, cuerpo: Record<string, unknown>): Promise<string | null> {
+  try {
+    const respuesta = await fetch(url, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) });
+    if (respuesta.ok) return null;
+    return ((await respuesta.json().catch(() => null)) as { error?: string } | null)?.error ?? `Error ${respuesta.status}`;
+  } catch {
+    return "No pude conectarme";
+  }
+}
+
+function TarjetaBot({ bot }: { bot: BotPanel }) {
+  const corrida = bot.ultimaCorrida;
+  const [guardando, setGuardando] = useState(false);
+  async function alternarPausa() {
+    setGuardando(true);
+    const error = await cambiar(`/api/laboratorio/bots/${bot.clave}`, { pausado: !bot.pausado });
+    if (error) alert(error);
+    else window.location.reload();
+    setGuardando(false);
+  }
+  return (
+    <article className="px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{bot.nombre}</p>
+          <p className="text-xs text-muted">
+            {bot.perfil === "completo" ? "Ve precios, noticias, macro y memoria" : "Ve solo precios e indicadores"}
+            {bot.reactivo ? " · decide también ante eventos" : ""}
+          </p>
+        </div>
+        <button onClick={alternarPausa} disabled={guardando} className="pressable shrink-0 rounded-lg border border-border-soft px-2.5 py-1 text-xs text-muted hover:text-foreground disabled:opacity-50">
+          {bot.pausado ? "Reanudar" : "Pausar"}
+        </button>
+      </div>
+      <p className="mt-2 text-sm tabular-nums">
+        {bot.valorUsd === null ? "Sin snapshots todavía" : (
+          <>
+            {usd.format(bot.valorUsd)} <span className={colorVariacion(bot.rendimientoPct)}>({conSigno(bot.rendimientoPct)})</span>
+            {bot.efectivoUsd !== null && <span className="text-muted"> · efectivo {usd.format(bot.efectivoUsd)}</span>}
+          </>
+        )}
+        <span className="text-muted"> · IA acumulada {usd.format(bot.costoIaUsd)}</span>
+      </p>
+      {bot.pausado && <p className="mt-1 text-xs text-danger">En pausa{bot.motivoPausa ? `: ${bot.motivoPausa}` : ""}</p>}
+      {bot.posiciones.length > 0 && (
+        <p className="mt-1 text-xs text-muted tabular-nums">Posiciones: {bot.posiciones.map((posicion) => `${posicion.ticker} ${usd.format(posicion.valorUsd)}`).join(" · ")}</p>
+      )}
+      {corrida && (
+        <div className="mt-2 border-t border-border-soft pt-2 text-xs">
+          <p className="text-muted">
+            Última decisión: {hora(corrida.ts)} · {corrida.disparador === "evento" ? "por evento" : "diaria"} · {corrida.estado === "sin_cambios" ? "no operó" : corrida.estado === "ok" ? "operó" : corrida.estado}
+            {corrida.modelo ? ` · ${corrida.modelo}` : ""}
+          </p>
+          {corrida.error && <p className="text-danger">{corrida.error}</p>}
+          {corrida.resumenMercado && <p className="mt-1">{corrida.resumenMercado}</p>}
+          <ul className="mt-1 flex flex-col gap-1">
+            {corrida.decisiones.map((decision, indice) => (
+              <li key={`${decision.ticker}-${indice}`}>
+                <span className="font-medium">
+                  {ACCION_TEXTO[decision.accion] ?? decision.accion} {decision.ticker}
+                  {decision.accion !== "mantener" && ` ${usd.format(decision.montoAprobadoUsd)}`}
+                </span>
+                {decision.razon && <span className="text-muted"> · {decision.razon}</span>}
+                {decision.ajuste && <span className="text-accent"> · {decision.ajuste}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function SeccionBots({ datos }: { datos: LaboratorioBotsPanel }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  async function cambiarActivo(activo: boolean) {
+    setGuardando(true);
+    const error = await cambiar("/api/laboratorio/config", { activo });
+    if (error) {
+      alert(error);
+      setGuardando(false);
+      return;
+    }
+    window.location.reload();
+  }
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-lg font-semibold">Bots simulados</h2>
+      {!datos.activo ? (
+        <div className="card flex flex-col gap-3 p-4">
+          <p className="text-sm text-muted">
+            Tres bots invierten con US$1.000 ficticios cada uno en cuentas de paper trading de Alpaca: el A ve todo y también decide ante eventos, el B ve todo y decide una vez por día, y el C ve solo precios. Se comparan entre sí y contra comprar VOO y no hacer nada, durante 6 meses. Están en pausa hasta que los actives.
+          </p>
+          {!confirmando ? (
+            <button onClick={() => setConfirmando(true)} className="pressable self-start rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-black">Activar laboratorio</button>
+          ) : (
+            <div className="flex flex-col gap-2 rounded-xl border border-accent/40 p-3 text-sm">
+              <p>Esto empieza la corrida de 6 meses: desde la próxima rueda los bots van a operar en sus cuentas paper (plata ficticia) y cada decisión suma un poco de costo de IA. Podés pausarlos cuando quieras.</p>
+              <div className="flex gap-2">
+                <button onClick={() => cambiarActivo(true)} disabled={guardando} className="pressable rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-black disabled:opacity-50">{guardando ? "Activando…" : "Confirmar y empezar"}</button>
+                <button onClick={() => setConfirmando(false)} className="pressable rounded-xl border border-border-soft px-4 py-2 text-sm text-muted">Cancelar</button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <p className="-mt-1 text-xs text-muted">
+            Corrida de {datos.diasTotales} días: va el día {datos.diasTranscurridos ?? 0}, faltan {Math.max(0, datos.diasTotales - (datos.diasTranscurridos ?? 0))}. Seis meses es poco para descartar suerte.
+            {datos.benchmark ? ` Comprar VOO y no hacer nada: ${usd.format(datos.benchmark.valorUsd)} (${conSigno(datos.benchmark.rendimientoPct)}).` : " El benchmark de VOO arranca con la primera decisión."}
+          </p>
+          <div className="card divide-y divide-border-soft">
+            {datos.bots.map((bot) => <TarjetaBot key={bot.clave} bot={bot} />)}
+          </div>
+          <button onClick={() => cambiarActivo(false)} disabled={guardando} className="pressable self-start rounded-lg border border-border-soft px-3 py-1.5 text-xs text-muted hover:text-foreground disabled:opacity-50">Pausar todo el laboratorio</button>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -249,6 +374,8 @@ export function PanelLaboratorio({ panelInicial }: { panelInicial: PanelEnVivo }
           ))}
         </ul>
       </section>
+
+      <SeccionBots datos={panel.bots} />
 
       {sinDatos && (
         <p className="card p-4 text-sm text-muted">Todavía no hay datos. Aparecen cuando corran las tareas programadas (precios con el mercado abierto, noticias cada 30 minutos, macro una vez por día).</p>
