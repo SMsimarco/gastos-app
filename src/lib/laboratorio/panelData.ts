@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ETFS_UNIVERSO, UNIVERSO_DEFAULT, fechaNuevaYork } from "./config";
+import { armarPanelBots, type LaboratorioBotsPanel } from "./bots/panelBots";
 import { EVENTOS } from "./eventos";
 import { armarSenales, type EstadisticaDB, type SenalConMemoria } from "./memoria";
 import {
@@ -81,6 +82,7 @@ export type PanelEnVivo = {
   fundamentales: FilaFundamentalPanel[];
   filings: FilingPanel[];
   aprendizaje: AprendizajePanel;
+  bots: LaboratorioBotsPanel;
   noticias: NoticiaPanel[];
   calendario: EventoCalendarioPanel[];
   eventos: EventoMercadoPanel[];
@@ -104,7 +106,7 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
   const empresas = universo.filter((ticker) => !ETFS_UNIVERSO.has(ticker));
   const hace90Dias = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
 
-  const [precios, indicadores, macro, noticias, calendario, eventos, ejecuciones, fundamentales, analistas, sorpresas, insiders, filings, diario, estadisticas, senales] = await Promise.all([
+  const [precios, indicadores, macro, noticias, calendario, eventos, ejecuciones, fundamentales, analistas, sorpresas, insiders, filings, diario, estadisticas, senales, configBots, filasBots, snapshotsBots, corridasBots] = await Promise.all([
     supabase.from("lab_precios").select("ticker, ts, precio").eq("tipo", "intradia").in("ticker", universo).order("ts", { ascending: false }).limit(universo.length * 40),
     supabase.from("lab_indicadores").select("ticker, fecha, datos").in("ticker", universo).order("fecha", { ascending: false }).limit(universo.length * 2),
     // Una consulta por serie: con un solo límite global, las series diarias desplazan a las mensuales (CPI, desempleo).
@@ -127,7 +129,18 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
     supabase.from("lab_diario").select("fecha, resumen, puntos_clave, a_mirar, tono").order("fecha", { ascending: false }).limit(5),
     supabase.from("lab_estadisticas").select("evento, ticker, horizonte, n, media, mediana, pct_positivo, media_base, desde, hasta").limit(1000),
     supabase.from("lab_senales").select("ticker, fecha, evento").order("fecha", { ascending: false }).limit(60),
+    supabase.from("lab_config").select("activo, fecha_inicio, capital_inicial_usd").eq("usuario_id", usuarioId).maybeSingle(),
+    supabase.from("lab_bots").select("id, clave, nombre, perfil_info, reactivo, pausado, motivo_pausa").eq("usuario_id", usuarioId),
+    supabase.from("lab_snapshots").select("bot_id, ts, valor_usd, efectivo_usd, costo_ia_acumulado_usd, posiciones").eq("usuario_id", usuarioId).order("ts", { ascending: false }).limit(80),
+    supabase.from("lab_corridas").select("id, bot_id, ts, estado, disparador, modelo, error, respuesta_ia").eq("usuario_id", usuarioId).order("ts", { ascending: false }).limit(20),
   ]);
+
+  // Decisiones de la última corrida de cada bot.
+  const ultimaPorBot = new Map<string, string>();
+  for (const corrida of corridasBots.data ?? []) if (!ultimaPorBot.has(corrida.bot_id as string)) ultimaPorBot.set(corrida.bot_id as string, corrida.id as string);
+  const { data: decisionesBots } = ultimaPorBot.size > 0
+    ? await supabase.from("lab_decisiones").select("corrida_id, ticker, accion, monto_propuesto_usd, monto_aprobado_usd, razon_ia, ajuste_riesgo, estado_orden, precio_ejecucion").eq("usuario_id", usuarioId).in("corrida_id", [...ultimaPorBot.values()])
+    : { data: [] };
 
   // Estadísticas: todo el universo ('*') para la tabla, y las filas completas para ligar cada señal de hoy.
   const filasEstadisticas = (estadisticas.data ?? []).map((fila) => ({
@@ -204,6 +217,14 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
       hoy,
     }),
     filings: (filings.data ?? []) as FilingPanel[],
+    bots: armarPanelBots({
+      config: configBots.data as { activo: boolean; fecha_inicio: string | null; capital_inicial_usd: number } | null,
+      bots: (filasBots.data ?? []) as Parameters<typeof armarPanelBots>[0]["bots"],
+      snapshots: (snapshotsBots.data ?? []) as Parameters<typeof armarPanelBots>[0]["snapshots"],
+      corridas: (corridasBots.data ?? []) as Parameters<typeof armarPanelBots>[0]["corridas"],
+      decisiones: (decisionesBots ?? []) as Parameters<typeof armarPanelBots>[0]["decisiones"],
+      hoy,
+    }),
     aprendizaje: {
       diario: (diario.data ?? []) as DiarioPanel[],
       senales: armarSenales(senalesDeHoy, filasEstadisticas),

@@ -30,7 +30,7 @@ function sumarDias(fecha: string, dias: number): string {
   return new Date(Date.parse(`${fecha}T00:00:00Z`) + dias * 86_400_000).toISOString().slice(0, 10);
 }
 
-function descripcionCalendario(evento: EntradaHechos["calendario"][number]): string {
+export function descripcionCalendario(evento: EntradaHechos["calendario"][number]): string {
   switch (evento.tipo) {
     case "fed":
       return "Reunión de la Fed (decisión de tasas)";
@@ -43,7 +43,7 @@ function descripcionCalendario(evento: EntradaHechos["calendario"][number]): str
   }
 }
 
-function formatoMacro(fila: FilaMacroPanel): { nombre: string; valor: string; variacion: string; al: string } {
+export function formatoMacro(fila: FilaMacroPanel): { nombre: string; valor: string; variacion: string; al: string } {
   const unidad = fila.unidad === "%" ? "%" : fila.unidad === "pb" ? " pb" : "";
   const variacion =
     fila.variacion === null

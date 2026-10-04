@@ -7,6 +7,8 @@ type PrecioModelo = { entrada: number; salida: number }; // USD por millón de t
 export const PRECIOS_MODELO: Record<string, PrecioModelo> = {
   "gemini-3.5-flash-lite": { entrada: 0.3, salida: 2.5 },
   "gemini-3.6-flash": { entrada: 0.75, salida: 3.75 },
+  "gemini-3.7-flash": { entrada: 0.75, salida: 3.75 },
+  "gemini-3.8-flash": { entrada: 0.75, salida: 3.75 },
   "gemini-3.5-flash": { entrada: 1.5, salida: 9 },
 };
 
