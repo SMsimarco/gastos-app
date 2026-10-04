@@ -170,6 +170,12 @@ export function parsearDividendos(filas: DividendoAlpaca[]): Dividendo[] {
   });
 }
 
+// Alpaca filtra por fecha de proceso o de pago, así que puede devolver dividendos cuya fecha ex ya pasó
+// (pasó con QQQ: ex 21/9, pago 8/10). Al calendario solo van los que todavía no tuvieron fecha ex.
+export function dividendosFuturos(dividendos: Dividendo[], hoy: string): Dividendo[] {
+  return dividendos.filter((dividendo) => dividendo.fechaEx >= hoy);
+}
+
 // Próximos dividendos en efectivo del universo (fecha ex entre `desde` y `hasta`, YYYY-MM-DD).
 export async function obtenerDividendos(tickers: string[], desde: string, hasta: string): Promise<Dividendo[]> {
   const params = new URLSearchParams({ symbols: tickers.join(","), types: "cash_dividend", start: desde, end: hasta, limit: "100" });

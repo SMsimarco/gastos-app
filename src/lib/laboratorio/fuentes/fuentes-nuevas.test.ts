@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsearDividendos } from "./alpaca";
+import { dividendosFuturos, parsearDividendos } from "./alpaca";
 import { parsearDolares, parsearRiesgoPais } from "./argentina";
 import { mapearCik, parsearFilings } from "./edgar";
 import { parsearInsiders, parsearMetricas, parsearRecomendaciones, parsearSorpresas } from "./finnhub";
@@ -89,6 +89,21 @@ describe("alpaca: dividendos", () => {
         { symbol: "SCHD", ex_date: "2026-12-10", rate: 0 },
       ])
     ).toEqual([{ ticker: "KO", fechaEx: "2026-11-14", fechaPago: "2026-12-01", monto: 0.53, especial: false }]);
+  });
+});
+
+describe("alpaca: dividendos futuros", () => {
+  it("descarta los que ya tuvieron fecha ex (Alpaca devolvió el de QQQ del 21/9 pidiendo desde el 4/10) y conserva los de hoy y los próximos", () => {
+    const base = { fechaPago: null, monto: 1, especial: false };
+    const resultado = dividendosFuturos(
+      [
+        { ...base, ticker: "QQQ", fechaEx: "2026-09-21" },
+        { ...base, ticker: "KO", fechaEx: "2026-10-04" },
+        { ...base, ticker: "JPM", fechaEx: "2026-10-06" },
+      ],
+      "2026-10-04"
+    );
+    expect(resultado.map((dividendo) => dividendo.ticker)).toEqual(["KO", "JPM"]);
   });
 });
 
