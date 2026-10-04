@@ -12,6 +12,7 @@ export type ContextoLab = {
   universo: string[];
   topeIaUsd: number;
   modeloResumen: string;
+  modeloDecision: string;
   monitor: Pick<ConfigMonitor, "maxDecisionesEventoPorDia" | "cooldownEventoMin">;
 };
 
@@ -19,6 +20,7 @@ type FilaConfig = {
   universo: string[];
   max_costo_ia_mensual_usd: number;
   modelo_resumen: string;
+  modelo_decision: string;
   max_decisiones_evento_por_dia: number;
   cooldown_evento_min: number;
 };
@@ -28,13 +30,14 @@ type FilaConfig = {
 export async function leerContextoLab(supabase: SupabaseClient): Promise<ContextoLab> {
   const { data } = await supabase
     .from("lab_config")
-    .select("universo, max_costo_ia_mensual_usd, modelo_resumen, max_decisiones_evento_por_dia, cooldown_evento_min");
+    .select("universo, max_costo_ia_mensual_usd, modelo_resumen, modelo_decision, max_decisiones_evento_por_dia, cooldown_evento_min");
   const filas = (data ?? []) as FilaConfig[];
   if (filas.length === 0) {
     return {
       universo: UNIVERSO_DEFAULT,
       topeIaUsd: 10,
       modeloResumen: "gemini-3.5-flash-lite",
+      modeloDecision: "gemini-3.6-flash",
       monitor: { maxDecisionesEventoPorDia: 2, cooldownEventoMin: 60 },
     };
   }
@@ -42,6 +45,7 @@ export async function leerContextoLab(supabase: SupabaseClient): Promise<Context
     universo: [...new Set(filas.flatMap((fila) => fila.universo.map((ticker) => ticker.toUpperCase())))],
     topeIaUsd: Math.min(...filas.map((fila) => Number(fila.max_costo_ia_mensual_usd))),
     modeloResumen: filas[0].modelo_resumen,
+    modeloDecision: filas[0].modelo_decision,
     monitor: {
       maxDecisionesEventoPorDia: Math.min(...filas.map((fila) => fila.max_decisiones_evento_por_dia)),
       cooldownEventoMin: Math.max(...filas.map((fila) => fila.cooldown_evento_min)),

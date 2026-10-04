@@ -44,6 +44,7 @@ const eslintConfig = defineConfig([
       "src/app/api/lab/macro/route.ts",
       "src/app/api/lab/gdelt/route.ts",
       "src/app/api/lab/fundamentales/route.ts",
+      "src/app/api/lab/aprendizaje/route.ts",
     ],
     rules: {
       "no-restricted-imports": "off",

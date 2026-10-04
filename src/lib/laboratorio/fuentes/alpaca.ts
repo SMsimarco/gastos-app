@@ -46,13 +46,16 @@ export async function obtenerBarrasDiarias(tickers: string[], dias = 400): Promi
   const acumulado: Record<string, BarraAlpaca[]> = {};
   let pagina: string | null = null;
   for (let i = 0; i < 5; i++) {
+    // Feed consolidado (SIP): el plan gratis lo permite para datos con más de 15 minutos y da cierres y
+    // volúmenes del mercado completo (el feed IEX es una fracción: AAPL 0,8 M de acciones contra 33 M).
     const params = new URLSearchParams({
       symbols: tickers.join(","),
       timeframe: "1Day",
       start: inicio,
+      end: new Date(Date.now() - 20 * 60_000).toISOString(),
       limit: "10000",
       adjustment: "split",
-      feed: "iex",
+      feed: "sip",
     });
     if (pagina) params.set("page_token", pagina);
     const data = await pedir<{ bars?: Record<string, BarraAlpaca[]>; next_page_token?: string | null }>(
