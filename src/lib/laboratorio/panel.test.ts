@@ -65,6 +65,20 @@ describe("ultimaEjecucionPorTarea", () => {
   });
 });
 
+describe("ultimaEjecucionPorTarea: tareas viejas", () => {
+  it("no muestra una tarea sin corridas en las últimas 36 horas (por ejemplo una pausada)", () => {
+    const ahora = new Date("2026-10-05T12:00:00Z");
+    const resultado = ultimaEjecucionPorTarea(
+      [
+        { tarea: "noticias", ts: "2026-10-05T11:30:00Z", ok: true, error: null },
+        { tarea: "gdelt", ts: "2026-10-03T12:00:00Z", ok: false, error: "fetch failed" },
+      ],
+      ahora
+    );
+    expect(resultado.map((fila) => fila.tarea)).toEqual(["noticias"]);
+  });
+});
+
 describe("hayErrores", () => {
   it("detecta errores anidados de fuentes, de la IA y de bloques enteros", () => {
     expect(hayErrores({ recoleccion: { errores: [{ fuente: "gdelt", error: "x" }] } })).toBe(true);
