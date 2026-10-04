@@ -37,15 +37,17 @@ select cron.schedule('lab-noticias', '*/30 * * * *', $job$
   );
 $job$);
 
--- Noticias globales (GDELT): cada 10 minutos, un tema por corrida (rotan los 7 temas). GDELT tarda
--- 20-40 s por pedido y limita a 1 pedido cada 5 s, por eso no se consultan todos juntos.
-select cron.schedule('lab-gdelt', '*/10 * * * *', $job$
-  select net.http_get(
-    url := 'https://gastosvoz.vercel.app/api/lab/gdelt',
-    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
-    timeout_milliseconds := 58000
-  );
-$job$);
+-- Noticias globales de GDELT: PAUSADO. Verificado el 2026-10-04: desde la red de prueba y desde Vercel
+-- falla casi siempre (HTTP 429 o "fetch failed" por timeout de conexión). Las noticias globales salen
+-- hoy del flujo general de Alpaca (job lab-noticias). Para reactivar GDELT (un tema por corrida, cada
+-- 10 min), descomentá el bloque y ejecutalo, o: select cron.alter_job(<jobid>, active := true);
+-- select cron.schedule('lab-gdelt', '*/10 * * * *', $job$
+--   select net.http_get(
+--     url := 'https://gastosvoz.vercel.app/api/lab/gdelt',
+--     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
+--     timeout_milliseconds := 58000
+--   );
+-- $job$);
 
 -- Indicadores, macro y calendario: una vez por día, después del cierre (22:30 UTC cubre verano e invierno).
 select cron.schedule('lab-macro', '30 22 * * 1-5', $job$

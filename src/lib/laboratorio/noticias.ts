@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { obtenerNoticias as obtenerNoticiasAlpaca, type NoticiaCruda } from "./fuentes/alpaca";
+import { obtenerNoticias as obtenerNoticiasAlpaca, obtenerNoticiasGenerales, type NoticiaCruda } from "./fuentes/alpaca";
 import { obtenerNoticiasDeTema, temaDeLaCorrida, type NoticiaGlobalCruda } from "./fuentes/gdelt";
 import { mensajeDeError } from "./fuentes/http";
 import { llamarGeminiJson } from "./gemini";
 import { costoLlamadaUsd, evaluarPresupuesto, inicioDeMesUtc } from "./presupuesto";
+import { temaPorPalabrasClave } from "./temas";
 
 export const MAX_NOTICIAS_POR_LOTE = 40;
 const HORAS_MAX_PENDIENTE = 48;
@@ -29,6 +30,8 @@ export function elegirTickers(tickersDeLaFuente: string[], universo: string[]): 
 export function filasDeNoticias(params: {
   empresa: NoticiaCruda[];
   globales: NoticiaGlobalCruda[];
+  // Flujo general de mercado (sin filtrar por ticker): se queda solo con lo que toca un tema global.
+  generales?: NoticiaCruda[];
   universo: string[];
 }): FilaNoticia[] {
   const filas = new Map<string, FilaNoticia>();
@@ -40,6 +43,22 @@ export function filasDeNoticias(params: {
       ticker,
       tickers,
       tema: null,
+      titular: noticia.titular,
+      url: noticia.url,
+      publicado_at: noticia.publicadoAt,
+    });
+  }
+  for (const noticia of params.generales ?? []) {
+    if (filas.has(noticia.url)) continue;
+    // Las que nombran tickers del universo ya entran como noticias de empresa.
+    if (elegirTickers(noticia.tickers, params.universo).ticker) continue;
+    const tema = temaPorPalabrasClave(noticia.titular);
+    if (!tema) continue;
+    filas.set(noticia.url, {
+      fuente: noticia.fuente,
+      ticker: null,
+      tickers: [],
+      tema,
       titular: noticia.titular,
       url: noticia.url,
       publicado_at: noticia.publicadoAt,
@@ -147,14 +166,27 @@ async function guardarFilas(supabase: SupabaseClient, filas: FilaNoticia[]): Pro
   return data?.length ?? 0;
 }
 
-// Noticias por empresa (Alpaca) de las últimas 6 horas.
-export async function recolectarNoticiasEmpresa(supabase: SupabaseClient, universo: string[]): Promise<ResultadoRecoleccion> {
+// Noticias de Alpaca: por empresa del universo (últimas 6 h) y el flujo general de mercado filtrado
+// por los temas globales (últimas 3 h). Cada flujo falla por separado.
+export async function recolectarNoticiasAlpaca(supabase: SupabaseClient, universo: string[]): Promise<ResultadoRecoleccion> {
+  const errores: ResultadoRecoleccion["errores"] = [];
+  const ahora = Date.now();
+  const [empresa, generales] = await Promise.allSettled([
+    obtenerNoticiasAlpaca(universo, new Date(ahora - 6 * 3_600_000)),
+    obtenerNoticiasGenerales(new Date(ahora - 3 * 3_600_000)),
+  ]);
+  if (empresa.status === "rejected") errores.push({ fuente: "alpaca-empresas", error: mensajeDeError(empresa.reason) });
+  if (generales.status === "rejected") errores.push({ fuente: "alpaca-generales", error: mensajeDeError(generales.reason) });
+  const filas = filasDeNoticias({
+    empresa: empresa.status === "fulfilled" ? empresa.value : [],
+    generales: generales.status === "fulfilled" ? generales.value : [],
+    globales: [],
+    universo,
+  });
   try {
-    const empresa = await obtenerNoticiasAlpaca(universo, new Date(Date.now() - 6 * 3_600_000));
-    const filas = filasDeNoticias({ empresa, globales: [], universo });
-    return { nuevas: await guardarFilas(supabase, filas), vistas: filas.length, errores: [] };
+    return { nuevas: await guardarFilas(supabase, filas), vistas: filas.length, errores };
   } catch (error) {
-    return { nuevas: 0, vistas: 0, errores: [{ fuente: "alpaca-noticias", error: mensajeDeError(error) }] };
+    return { nuevas: 0, vistas: filas.length, errores: [...errores, { fuente: "base-de-datos", error: mensajeDeError(error) }] };
   }
 }
 

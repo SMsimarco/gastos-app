@@ -137,12 +137,9 @@ export async function obtenerNoticias(tickers: string[], desde: Date, maxPaginas
   const resultado: NoticiaCruda[] = [];
   let pagina: string | null = null;
   for (let i = 0; i < maxPaginas; i++) {
-    const params = new URLSearchParams({
-      symbols: tickers.join(","),
-      start: desde.toISOString(),
-      limit: "50",
-      sort: "desc",
-    });
+    const params = new URLSearchParams({ start: desde.toISOString(), limit: "50", sort: "desc" });
+    // Sin tickers trae el flujo general de noticias de mercado (macro, Fed, petróleo, etc.).
+    if (tickers.length > 0) params.set("symbols", tickers.join(","));
     if (pagina) params.set("page_token", pagina);
     const data = await pedir<{ news?: NoticiaAlpaca[]; next_page_token?: string | null }>(`${DATA_URL}/v1beta1/news?${params}`);
     resultado.push(...parsearNoticias(data.news ?? []));
@@ -150,4 +147,9 @@ export async function obtenerNoticias(tickers: string[], desde: Date, maxPaginas
     if (!pagina) break;
   }
   return resultado;
+}
+
+// Noticias generales de mercado (sin filtrar por ticker): respaldo confiable para las noticias globales.
+export async function obtenerNoticiasGenerales(desde: Date, maxPaginas = 3): Promise<NoticiaCruda[]> {
+  return obtenerNoticias([], desde, maxPaginas);
 }

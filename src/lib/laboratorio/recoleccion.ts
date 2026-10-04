@@ -7,7 +7,7 @@ import { obtenerSerieFred, SERIES_MACRO } from "./fuentes/fred";
 import { mensajeDeError } from "./fuentes/http";
 import { calcularIndicadores } from "./indicadores";
 import { CONFIG_MONITOR_DEFAULT, detectarEventos } from "./monitor";
-import { recolectarNoticiasEmpresa, recolectarNoticiasGlobales, resumirNoticiasPendientes } from "./noticias";
+import { recolectarNoticiasAlpaca, recolectarNoticiasGlobales, resumirNoticiasPendientes } from "./noticias";
 
 export type TareaLab = "monitor" | "noticias" | "gdelt" | "macro";
 
@@ -127,7 +127,7 @@ export async function ejecutarMonitor(supabase: SupabaseClient) {
 
 export async function ejecutarNoticias(supabase: SupabaseClient) {
   const contexto = await leerContextoLab(supabase);
-  const recoleccion = await recolectarNoticiasEmpresa(supabase, contexto.universo);
+  const recoleccion = await recolectarNoticiasAlpaca(supabase, contexto.universo);
   const resumen = await resumirNoticiasPendientes(supabase, {
     universo: contexto.universo,
     modelo: contexto.modeloResumen,

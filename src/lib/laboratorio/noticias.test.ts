@@ -42,6 +42,46 @@ describe("filasDeNoticias", () => {
   });
 });
 
+describe("filasDeNoticias con el flujo general de mercado", () => {
+  const base = { fuente: "alpaca:benzinga", resumenFuente: null, publicadoAt: "2026-10-05T10:00:00Z" };
+
+  it("las generales con un tema entran como globales, con su tema y sin ticker", () => {
+    const filas = filasDeNoticias({
+      universo: UNIVERSO,
+      empresa: [],
+      globales: [],
+      generales: [{ ...base, titular: "Crude Oil Down Over 1%", url: "https://a/oil", tickers: ["USO", "SPY"] }],
+    });
+    expect(filas).toEqual([
+      { fuente: "alpaca:benzinga", ticker: null, tickers: [], tema: "petroleo", titular: "Crude Oil Down Over 1%", url: "https://a/oil", publicado_at: "2026-10-05T10:00:00Z" },
+    ]);
+  });
+
+  it("descarta las generales sin tema y las que ya son noticias de empresa del universo", () => {
+    const filas = filasDeNoticias({
+      universo: UNIVERSO,
+      empresa: [],
+      globales: [],
+      generales: [
+        { ...base, titular: "72% Of Americans Are Doing This With Their Money", url: "https://a/1", tickers: [] },
+        { ...base, titular: "Fed chief speaks; NVDA reacts", url: "https://a/2", tickers: ["NVDA"] },
+      ],
+    });
+    expect(filas).toEqual([]);
+  });
+
+  it("una general repetida entre feeds no se duplica", () => {
+    const noticia = { ...base, titular: "Fed holds rates", url: "https://a/fed", tickers: ["SPY"] };
+    const filas = filasDeNoticias({
+      universo: UNIVERSO,
+      empresa: [],
+      generales: [noticia, noticia],
+      globales: [{ tema: "fed", titular: "Fed holds rates", url: "https://a/fed", publicadoAt: "2026-10-05T10:00:00Z", dominio: "x.com" }],
+    });
+    expect(filas).toHaveLength(1);
+  });
+});
+
 describe("normalizarResumenes", () => {
   it("acota rangos, filtra tickers fuera del universo y descarta índices inválidos", () => {
     const resultado = normalizarResumenes(

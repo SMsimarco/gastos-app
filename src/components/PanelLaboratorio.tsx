@@ -28,7 +28,7 @@ function fechaCorta(fecha: string) {
   return `${dia}/${mes}/${anio}`;
 }
 
-const NOMBRE_TAREA = { monitor: "Monitor", noticias: "Noticias de empresas", gdelt: "Noticias globales", macro: "Macro y calendario" } as const;
+const NOMBRE_TAREA = { monitor: "Monitor", noticias: "Noticias (empresas y mercado)", gdelt: "Noticias GDELT", macro: "Macro y calendario" } as const;
 const NOMBRE_TEMA: Record<string, string> = {
   fed: "Fed",
   inflacion: "Inflación",

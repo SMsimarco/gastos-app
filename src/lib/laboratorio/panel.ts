@@ -66,12 +66,18 @@ export function resumirMacro(serie: string, filas: Array<{ fecha: string; valor:
 
 export type EstadoFuente = { tarea: TareaLab; ts: string; ok: boolean; error: string | null };
 
-// `ejecuciones` de la más nueva a la más vieja: se queda con la última de cada tarea.
-export function ultimaEjecucionPorTarea(ejecuciones: Array<{ tarea: TareaLab; ts: string; ok: boolean; error: string | null }>): EstadoFuente[] {
+// `ejecuciones` de la más nueva a la más vieja: se queda con la última de cada tarea. Una tarea sin
+// corridas en las últimas `maxHoras` (por ejemplo una pausada) no se muestra, para no dejar un error viejo en pantalla.
+export function ultimaEjecucionPorTarea(
+  ejecuciones: Array<{ tarea: TareaLab; ts: string; ok: boolean; error: string | null }>,
+  ahora: Date = new Date(),
+  maxHoras = 36
+): EstadoFuente[] {
   const vistas = new Set<TareaLab>();
   const resultado: EstadoFuente[] = [];
   for (const ejecucion of ejecuciones) {
     if (vistas.has(ejecucion.tarea)) continue;
+    if (ahora.getTime() - new Date(ejecucion.ts).getTime() > maxHoras * 3_600_000) continue;
     vistas.add(ejecucion.tarea);
     resultado.push(ejecucion);
   }
