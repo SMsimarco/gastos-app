@@ -3,6 +3,7 @@ import { obtenerConfigPlan, obtenerGastoMensualConFuente, obtenerUltimoMep } fro
 import { GestionPlan } from "@/components/GestionPlan";
 import { GestionMetas } from "@/components/GestionMetas";
 import { ProyeccionDepto } from "@/components/ProyeccionDepto";
+import { SeccionAprender } from "@/components/SeccionAprender";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,8 @@ export default async function PlanPage() {
         mepReferenciaInicial={mepReferencia}
         repartoPendienteInicial={repartoPendiente ?? null}
       />
-      <div className="w-full max-w-md mx-auto px-5 pb-6">
+      <div className="w-full max-w-md mx-auto px-5 pb-6 flex flex-col gap-4">
+        <SeccionAprender />
         <ProyeccionDepto />
       </div>
       <GestionMetas metasIniciales={metas ?? []} />

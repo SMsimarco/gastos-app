@@ -23,8 +23,9 @@ describe("calcularReparto", () => {
     expect(resultado.gastos).toBe(172_500);
     expect(resultado.emergencia).toBe(179.6);
     expect(resultado.largo_plazo).toBe(134.83);
-    expect(resultado.aprender).toBe(0);
-    expect(resultado.por_invertir).toBe(20.74);
+    // Aprender se acumula en su propio bolsillo aunque quede debajo del mínimo.
+    expect(resultado.aprender).toBe(20.74);
+    expect(resultado.por_invertir).toBe(0);
     expect(resultado.acciones.length).toBeGreaterThan(0);
   });
 
@@ -54,8 +55,32 @@ describe("calcularReparto", () => {
     });
 
     expect(resultado.largo_plazo).toBe(0);
-    expect(resultado.aprender).toBe(0);
-    expect(resultado.por_invertir).toBe(75);
+    expect(resultado.aprender).toBe(10);
+    expect(resultado.por_invertir).toBe(65);
+  });
+
+  it("aprender se acumula solo y avisa cuánto falta para el mínimo", () => {
+    const resultado = calcularReparto({
+      montoIngresoArs: 154_400,
+      saldos: { gastos: 200_000, emergencia: 1_000, aprender: 30 },
+      gastoMensualArs: 100_000,
+      tcReferencia: 1_544,
+      config: configDefault,
+    });
+    expect(resultado.por_invertir).not.toBe(resultado.aprender);
+    expect(resultado.aprender).toBe(10);
+    expect(resultado.acciones.some((accion) => accion.includes("Aprender") && accion.includes("faltan US$60.00"))).toBe(true);
+  });
+
+  it("cuando el saldo de aprender llega al mínimo lo dice", () => {
+    const resultado = calcularReparto({
+      montoIngresoArs: 154_400,
+      saldos: { gastos: 200_000, emergencia: 1_000, aprender: 95 },
+      gastoMensualArs: 100_000,
+      tcReferencia: 1_544,
+      config: configDefault,
+    });
+    expect(resultado.acciones.some((accion) => accion.includes("ya podés elegir"))).toBe(true);
   });
 
   it("manda todo a gastos cuando un ingreso chico no alcanza para el piso", () => {

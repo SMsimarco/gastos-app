@@ -113,6 +113,16 @@ select cron.schedule('lab-cierre', '10 22 * * 1-5', $job$
   );
 $job$);
 
+-- Asesor de aprender (Fase 7): medicion de sugerencias contra VOO, promedio de P/E, propuesta mensual de pesos y avisos.
+-- Corre despues del cierre del laboratorio (lab-cierre 22:10 UTC).
+select cron.schedule('aprender-diario', '40 22 * * 1-5', $job$
+  select net.http_get(
+    url := 'https://gastosvoz.vercel.app/api/cron/aprender-diario',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
+    timeout_milliseconds := 58000
+  );
+$job$);
+
 -- Limpieza: precios intradía de más de 30 días y registros de ejecución de más de 60 días.
 select cron.schedule('lab-limpieza', '15 5 * * *', $job$
   delete from lab_precios where tipo = 'intradia' and ts < now() - interval '30 days';
