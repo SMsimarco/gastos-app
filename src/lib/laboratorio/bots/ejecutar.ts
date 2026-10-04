@@ -65,6 +65,7 @@ function limitesDe(config: FilaConfig): LimitesRiesgo {
 export type ResultadoBot = {
   clave: string;
   estado: string;
+  corridaId?: string;
   aprobadas?: number;
   ordenes?: number;
   costoUsd?: number;
@@ -151,7 +152,7 @@ async function correrBot(supabase: SupabaseClient, contexto: ContextoLab, config
 
   // 2) Datos para el briefing (el perfil solo_precios nunca lee noticias, macro ni memoria).
   const indicadores = await leerIndicadoresUniverso(supabase, config.universo);
-  const completos = bot.perfil_info === "completo" ? await leerDatosCompletos(supabase, config.universo, hoy) : undefined;
+  const completos = bot.perfil_info === "completo" ? await leerDatosCompletos(supabase, config.universo, hoy, bot.id) : undefined;
   const [{ data: decisionesHoy }, { data: snapshots }] = await Promise.all([
     supabase.from("lab_decisiones").select("created_at, orden_alpaca_id").eq("usuario_id", bot.usuario_id).eq("bot_id", bot.id).not("orden_alpaca_id", "is", null).gte("created_at", new Date(ahora.getTime() - 30 * 3_600_000).toISOString()),
     supabase.from("lab_snapshots").select("valor_usd").eq("usuario_id", bot.usuario_id).eq("bot_id", bot.id).order("valor_usd", { ascending: false }).limit(1),
@@ -253,7 +254,7 @@ async function correrBot(supabase: SupabaseClient, contexto: ContextoLab, config
   if (pausar && !simular) {
     await supabase.from("lab_bots").update({ pausado: true, motivo_pausa: pausar.motivo }).eq("id", bot.id).eq("usuario_id", bot.usuario_id);
   }
-  return { clave: bot.clave, estado: simular ? "simulada" : aprobadas.length > 0 ? "ok" : "sin_cambios", aprobadas: aprobadas.length, ordenes: ordenes.size, costoUsd, pausado: pausar?.motivo ?? null };
+  return { clave: bot.clave, corridaId, estado: simular ? "simulada" : aprobadas.length > 0 ? "ok" : "sin_cambios", aprobadas: aprobadas.length, ordenes: ordenes.size, costoUsd, pausado: pausar?.motivo ?? null };
 }
 
 // --- Todas las corridas ---

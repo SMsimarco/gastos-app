@@ -161,6 +161,20 @@ function TarjetaBot({ bot }: { bot: BotPanel }) {
       {bot.posiciones.length > 0 && (
         <p className="mt-1 text-xs text-muted tabular-nums">Posiciones: {bot.posiciones.map((posicion) => `${posicion.ticker} ${usd.format(posicion.valorUsd)}`).join(" · ")}</p>
       )}
+      {bot.lecciones.length > 0 && (
+        <div className="mt-2 border-t border-border-soft pt-2 text-xs">
+          <p className="text-muted">Lo que aprendió de sus decisiones (un solo caso no es una regla):</p>
+          <ul className="mt-1 flex flex-col gap-1">
+            {bot.lecciones.map((leccion, indice) => (
+              <li key={`${leccion.ticker}-${leccion.fecha}-${indice}`}>
+                <span className="font-medium">{leccion.ticker}</span>
+                <span className={colorVariacion(leccion.veredicto === "acerto" ? 1 : leccion.veredicto === "erro" ? -1 : 0)}> · {leccion.veredicto === "acerto" ? "acertó" : leccion.veredicto === "erro" ? "erró" : "neutral"} ({conSigno(leccion.resultadoPct)} contra {conSigno(leccion.vooPct)} de VOO)</span>
+                <span className="text-muted"> · {leccion.leccion}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {corrida && (
         <div className="mt-2 border-t border-border-soft pt-2 text-xs">
           <p className="text-muted">

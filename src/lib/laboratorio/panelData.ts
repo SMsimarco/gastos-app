@@ -106,7 +106,7 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
   const empresas = universo.filter((ticker) => !ETFS_UNIVERSO.has(ticker));
   const hace90Dias = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
 
-  const [precios, indicadores, macro, noticias, calendario, eventos, ejecuciones, fundamentales, analistas, sorpresas, insiders, filings, diario, estadisticas, senales, configBots, filasBots, snapshotsBots, corridasBots] = await Promise.all([
+  const [precios, indicadores, macro, noticias, calendario, eventos, ejecuciones, fundamentales, analistas, sorpresas, insiders, filings, diario, estadisticas, senales, configBots, filasBots, snapshotsBots, corridasBots, leccionesBots] = await Promise.all([
     supabase.from("lab_precios").select("ticker, ts, precio").eq("tipo", "intradia").in("ticker", universo).order("ts", { ascending: false }).limit(universo.length * 40),
     supabase.from("lab_indicadores").select("ticker, fecha, datos").in("ticker", universo).order("fecha", { ascending: false }).limit(universo.length * 2),
     // Una consulta por serie: con un solo límite global, las series diarias desplazan a las mensuales (CPI, desempleo).
@@ -133,6 +133,7 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
     supabase.from("lab_bots").select("id, clave, nombre, perfil_info, reactivo, pausado, motivo_pausa").eq("usuario_id", usuarioId),
     supabase.from("lab_snapshots").select("bot_id, ts, valor_usd, efectivo_usd, costo_ia_acumulado_usd, posiciones").eq("usuario_id", usuarioId).order("ts", { ascending: false }).limit(80),
     supabase.from("lab_corridas").select("id, bot_id, ts, estado, disparador, modelo, error, respuesta_ia").eq("usuario_id", usuarioId).order("ts", { ascending: false }).limit(20),
+    supabase.from("lab_lecciones").select("bot_id, fecha_decision, ticker, accion, resultado_pct, voo_pct, veredicto, leccion").eq("usuario_id", usuarioId).order("creada_at", { ascending: false }).limit(30),
   ]);
 
   // Decisiones de la última corrida de cada bot.
@@ -223,6 +224,7 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
       snapshots: (snapshotsBots.data ?? []) as Parameters<typeof armarPanelBots>[0]["snapshots"],
       corridas: (corridasBots.data ?? []) as Parameters<typeof armarPanelBots>[0]["corridas"],
       decisiones: (decisionesBots ?? []) as Parameters<typeof armarPanelBots>[0]["decisiones"],
+      lecciones: (leccionesBots.data ?? []) as NonNullable<Parameters<typeof armarPanelBots>[0]["lecciones"]>,
       hoy,
     }),
     aprendizaje: {
