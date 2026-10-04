@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FilaFundamentalPanel, FilaMacroPanel } from "@/lib/laboratorio/panel";
+import { SeccionComparacion } from "@/components/LaboratorioComparacion";
 import { MIN_CASOS } from "@/lib/laboratorio/eventos";
 import type { EstadisticaUsable } from "@/lib/laboratorio/memoria";
 import type { BotPanel, LaboratorioBotsPanel } from "@/lib/laboratorio/bots/panelBots";
@@ -390,6 +391,8 @@ export function PanelLaboratorio({ panelInicial }: { panelInicial: PanelEnVivo }
       </section>
 
       <SeccionBots datos={panel.bots} />
+
+      <SeccionComparacion panel={panel} />
 
       {sinDatos && (
         <p className="card p-4 text-sm text-muted">Todavía no hay datos. Aparecen cuando corran las tareas programadas (precios con el mercado abierto, noticias cada 30 minutos, macro una vez por día).</p>

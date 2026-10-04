@@ -88,9 +88,9 @@ describe("redactarResumenLab", () => {
     diasTotales: 182,
     benchmark: { valorUsd: 1_010, rendimientoPct: 1 },
     bots: [
-      { clave: "A", nombre: "A", perfil: "completo", reactivo: true, pausado: false, motivoPausa: null, valorUsd: 1_025, efectivoUsd: 500, rendimientoPct: 2.5, costoIaUsd: 0.1, lecciones: [], posiciones: [], ultimaCorrida: null },
-      { clave: "B", nombre: "B", perfil: "completo", reactivo: false, pausado: false, motivoPausa: null, valorUsd: 990, efectivoUsd: 600, rendimientoPct: -1, costoIaUsd: 0.1, lecciones: [], posiciones: [], ultimaCorrida: null },
-      { clave: "C", nombre: "C", perfil: "solo_precios", reactivo: false, pausado: false, motivoPausa: null, valorUsd: 1_012, efectivoUsd: 400, rendimientoPct: 1.2, costoIaUsd: 0.05, lecciones: [], posiciones: [], ultimaCorrida: null },
+      { clave: "A", nombre: "A", perfil: "completo", reactivo: true, pausado: false, motivoPausa: null, valorUsd: 1_025, efectivoUsd: 500, rendimientoPct: 2.5, costoIaUsd: 0.1, lecciones: [], posiciones: [], ultimaCorrida: null, historial: [] },
+      { clave: "B", nombre: "B", perfil: "completo", reactivo: false, pausado: false, motivoPausa: null, valorUsd: 990, efectivoUsd: 600, rendimientoPct: -1, costoIaUsd: 0.1, lecciones: [], posiciones: [], ultimaCorrida: null, historial: [] },
+      { clave: "C", nombre: "C", perfil: "solo_precios", reactivo: false, pausado: false, motivoPausa: null, valorUsd: 1_012, efectivoUsd: 400, rendimientoPct: 1.2, costoIaUsd: 0.05, lecciones: [], posiciones: [], ultimaCorrida: null, historial: [] },
     ],
     ...parcial,
   });

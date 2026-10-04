@@ -15,6 +15,8 @@ export type DecisionBotPanel = {
 
 export type LeccionPanel = { fecha: string; ticker: string; accion: string; resultadoPct: number; vooPct: number | null; veredicto: string; leccion: string };
 
+export type CorridaPanel = { id: string; ts: string; estado: string; disparador: string; modelo: string | null; resumenMercado: string; error: string | null; decisiones: DecisionBotPanel[] };
+
 export type BotPanel = {
   clave: string;
   nombre: string;
@@ -28,7 +30,8 @@ export type BotPanel = {
   costoIaUsd: number;
   lecciones: LeccionPanel[];
   posiciones: Array<{ ticker: string; valorUsd: number; resultadoPct: number | null }>;
-  ultimaCorrida: { ts: string; estado: string; disparador: string; modelo: string | null; resumenMercado: string; error: string | null; decisiones: DecisionBotPanel[] } | null;
+  ultimaCorrida: CorridaPanel | null;
+  historial: CorridaPanel[];
 };
 
 export type LaboratorioBotsPanel = {
@@ -67,7 +70,28 @@ export function armarPanelBots(params: {
     .sort((a, b) => orden.indexOf(a.clave) - orden.indexOf(b.clave))
     .map((bot) => {
       const snapshot = params.snapshots.find((fila) => fila.bot_id === bot.id);
-      const corrida = params.corridas.find((fila) => fila.bot_id === bot.id);
+      const corridasBot = params.corridas.filter((fila) => fila.bot_id === bot.id);
+      const aPanel = (corrida: FilaCorrida): CorridaPanel => ({
+        id: corrida.id,
+        ts: corrida.ts,
+        estado: corrida.estado,
+        disparador: corrida.disparador,
+        modelo: corrida.modelo,
+        resumenMercado: corrida.respuesta_ia?.resumen_mercado ?? "",
+        error: corrida.error,
+        decisiones: params.decisiones
+          .filter((decision) => decision.corrida_id === corrida.id)
+          .map((decision) => ({
+            ticker: decision.ticker,
+            accion: decision.accion,
+            montoPropuestoUsd: Number(decision.monto_propuesto_usd),
+            montoAprobadoUsd: Number(decision.monto_aprobado_usd),
+            razon: decision.razon_ia,
+            ajuste: decision.ajuste_riesgo,
+            estadoOrden: decision.estado_orden,
+            precioEjecucion: decision.precio_ejecucion === null ? null : Number(decision.precio_ejecucion),
+          })),
+      });
       return {
         clave: bot.clave,
         nombre: bot.nombre,
@@ -84,28 +108,8 @@ export function armarPanelBots(params: {
           .slice(0, 3)
           .map((fila) => ({ fecha: fila.fecha_decision, ticker: fila.ticker, accion: fila.accion, resultadoPct: Number(fila.resultado_pct), vooPct: fila.voo_pct === null ? null : Number(fila.voo_pct), veredicto: fila.veredicto, leccion: fila.leccion })),
         posiciones: (snapshot?.posiciones ?? []).map((posicion) => ({ ticker: posicion.ticker, valorUsd: Number(posicion.valor_usd), resultadoPct: posicion.resultado_pct ?? null })),
-        ultimaCorrida: corrida
-          ? {
-              ts: corrida.ts,
-              estado: corrida.estado,
-              disparador: corrida.disparador,
-              modelo: corrida.modelo,
-              resumenMercado: corrida.respuesta_ia?.resumen_mercado ?? "",
-              error: corrida.error,
-              decisiones: params.decisiones
-                .filter((decision) => decision.corrida_id === corrida.id)
-                .map((decision) => ({
-                  ticker: decision.ticker,
-                  accion: decision.accion,
-                  montoPropuestoUsd: Number(decision.monto_propuesto_usd),
-                  montoAprobadoUsd: Number(decision.monto_aprobado_usd),
-                  razon: decision.razon_ia,
-                  ajuste: decision.ajuste_riesgo,
-                  estadoOrden: decision.estado_orden,
-                  precioEjecucion: decision.precio_ejecucion === null ? null : Number(decision.precio_ejecucion),
-                })),
-            }
-          : null,
+        ultimaCorrida: corridasBot[0] ? aPanel(corridasBot[0]) : null,
+        historial: corridasBot.slice(0, 8).map(aPanel),
       };
     });
 

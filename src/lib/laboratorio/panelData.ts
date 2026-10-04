@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ETFS_UNIVERSO, UNIVERSO_DEFAULT, fechaNuevaYork } from "./config";
-import { armarPanelBots, type LaboratorioBotsPanel } from "./bots/panelBots";
+import { armarComparacion, type ComparacionPanel } from "./bots/comparacion";
+import { armarPresupuestoPanel, type PresupuestoPanel, type SnapshotGrafico } from "./bots/grafico";
+import { DIAS_EXPERIMENTO, armarPanelBots, type LaboratorioBotsPanel } from "./bots/panelBots";
+import { inicioDeMesUtc } from "./presupuesto";
 import { EVENTOS } from "./eventos";
 import { armarSenales, type EstadisticaDB, type SenalConMemoria } from "./memoria";
 import {
@@ -83,6 +86,9 @@ export type PanelEnVivo = {
   filings: FilingPanel[];
   aprendizaje: AprendizajePanel;
   bots: LaboratorioBotsPanel;
+  comparacion: ComparacionPanel;
+  grafico: { snapshots: SnapshotGrafico[]; botsPorId: Record<string, "A" | "B" | "C"> };
+  presupuesto: PresupuestoPanel;
   noticias: NoticiaPanel[];
   calendario: EventoCalendarioPanel[];
   eventos: EventoMercadoPanel[];
@@ -106,7 +112,7 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
   const empresas = universo.filter((ticker) => !ETFS_UNIVERSO.has(ticker));
   const hace90Dias = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
 
-  const [precios, indicadores, macro, noticias, calendario, eventos, ejecuciones, fundamentales, analistas, sorpresas, insiders, filings, diario, estadisticas, senales, configBots, filasBots, snapshotsBots, corridasBots, leccionesBots] = await Promise.all([
+  const [precios, indicadores, macro, noticias, calendario, eventos, ejecuciones, fundamentales, analistas, sorpresas, insiders, filings, diario, estadisticas, senales, configBots, filasBots, snapshotsBots, corridasBots, leccionesBots, cierresBots, operacionesBots, costosMes] = await Promise.all([
     supabase.from("lab_precios").select("ticker, ts, precio").eq("tipo", "intradia").in("ticker", universo).order("ts", { ascending: false }).limit(universo.length * 40),
     supabase.from("lab_indicadores").select("ticker, fecha, datos").in("ticker", universo).order("fecha", { ascending: false }).limit(universo.length * 2),
     // Una consulta por serie: con un solo límite global, las series diarias desplazan a las mensuales (CPI, desempleo).
@@ -129,19 +135,22 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
     supabase.from("lab_diario").select("fecha, resumen, puntos_clave, a_mirar, tono").order("fecha", { ascending: false }).limit(5),
     supabase.from("lab_estadisticas").select("evento, ticker, horizonte, n, media, mediana, pct_positivo, media_base, desde, hasta").limit(1000),
     supabase.from("lab_senales").select("ticker, fecha, evento").order("fecha", { ascending: false }).limit(60),
-    supabase.from("lab_config").select("activo, fecha_inicio, capital_inicial_usd").eq("usuario_id", usuarioId).maybeSingle(),
+    supabase.from("lab_config").select("activo, fecha_inicio, capital_inicial_usd, max_costo_ia_mensual_usd").eq("usuario_id", usuarioId).maybeSingle(),
     supabase.from("lab_bots").select("id, clave, nombre, perfil_info, reactivo, pausado, motivo_pausa").eq("usuario_id", usuarioId),
-    supabase.from("lab_snapshots").select("bot_id, ts, valor_usd, efectivo_usd, costo_ia_acumulado_usd, posiciones").eq("usuario_id", usuarioId).order("ts", { ascending: false }).limit(80),
-    supabase.from("lab_corridas").select("id, bot_id, ts, estado, disparador, modelo, error, respuesta_ia").eq("usuario_id", usuarioId).order("ts", { ascending: false }).limit(20),
+    supabase.from("lab_snapshots").select("bot_id, ts, tipo, valor_usd, efectivo_usd, costo_ia_acumulado_usd, posiciones").eq("usuario_id", usuarioId).order("ts", { ascending: false }).limit(400),
+    supabase.from("lab_corridas").select("id, bot_id, ts, estado, disparador, modelo, error, respuesta_ia").eq("usuario_id", usuarioId).order("ts", { ascending: false }).limit(40),
     supabase.from("lab_lecciones").select("bot_id, fecha_decision, ticker, accion, resultado_pct, voo_pct, veredicto, leccion").eq("usuario_id", usuarioId).order("creada_at", { ascending: false }).limit(30),
+    supabase.from("lab_snapshots").select("bot_id, ts, valor_usd").eq("usuario_id", usuarioId).eq("tipo", "cierre").order("ts", { ascending: true }).limit(3000),
+    supabase.from("lab_decisiones").select("bot_id, accion, ticker, precio_ejecucion, estado_orden").eq("usuario_id", usuarioId).not("orden_alpaca_id", "is", null).in("accion", ["comprar", "vender"]).limit(2000),
+    supabase.from("lab_costos_ia").select("tipo, costo_usd, detalle").gte("ts", inicioDeMesUtc(new Date())).limit(5000),
   ]);
 
-  // Decisiones de la última corrida de cada bot.
-  const ultimaPorBot = new Map<string, string>();
-  for (const corrida of corridasBots.data ?? []) if (!ultimaPorBot.has(corrida.bot_id as string)) ultimaPorBot.set(corrida.bot_id as string, corrida.id as string);
-  const { data: decisionesBots } = ultimaPorBot.size > 0
-    ? await supabase.from("lab_decisiones").select("corrida_id, ticker, accion, monto_propuesto_usd, monto_aprobado_usd, razon_ia, ajuste_riesgo, estado_orden, precio_ejecucion").eq("usuario_id", usuarioId).in("corrida_id", [...ultimaPorBot.values()])
+  // Decisiones de las corridas recientes (el diario de cada bot muestra las últimas).
+  const idsCorridas = (corridasBots.data ?? []).map((corrida) => corrida.id as string);
+  const { data: decisionesBots } = idsCorridas.length > 0
+    ? await supabase.from("lab_decisiones").select("corrida_id, ticker, accion, monto_propuesto_usd, monto_aprobado_usd, razon_ia, ajuste_riesgo, estado_orden, precio_ejecucion").eq("usuario_id", usuarioId).in("corrida_id", idsCorridas)
     : { data: [] };
+
 
   // Estadísticas: todo el universo ('*') para la tabla, y las filas completas para ligar cada señal de hoy.
   const filasEstadisticas = (estadisticas.data ?? []).map((fila) => ({
@@ -174,6 +183,35 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
       ultimosIndicadores.set(fila.ticker, { ...(fila.datos as Omit<FilaIndicadoresPanel, "fecha">), fecha: fila.fecha as string });
     }
   }
+
+  // Comparación entre los bots y contra el benchmark VOO, con precios actuales del universo.
+  const botsPorId: Record<string, "A" | "B" | "C"> = {};
+  for (const fila of filasBots.data ?? []) botsPorId[fila.id as string] = fila.clave as "A" | "B" | "C";
+  const preciosActuales: Record<string, number> = {};
+  for (const [ticker, indicador] of ultimosIndicadores) preciosActuales[ticker] = indicador.cierre;
+  for (const [ticker, intradia] of ultimoPrecio) preciosActuales[ticker] = intradia.valor;
+  const capitalLab = Number((configBots.data as { capital_inicial_usd?: number } | null)?.capital_inicial_usd ?? 1_000);
+  const comparacion = armarComparacion({
+    capitalUsd: capitalLab,
+    diasTotales: DIAS_EXPERIMENTO,
+    bots: (filasBots.data ?? []).map((fila) => ({ id: fila.id as string, clave: fila.clave as "A" | "B" | "C", nombre: fila.nombre as string })),
+    cierres: (cierresBots.data ?? []) as Array<{ bot_id: string | null; ts: string; valor_usd: number }>,
+    ultimos: (snapshotsBots.data ?? []) as Array<{ bot_id: string | null; ts: string; valor_usd: number; costo_ia_acumulado_usd: number }>,
+    operaciones: ((operacionesBots.data ?? []) as Array<{ bot_id: string; accion: string; ticker: string; precio_ejecucion: number | null; estado_orden: string }>).filter((fila) => !String(fila.estado_orden).startsWith("error")),
+    precios: preciosActuales,
+  });
+
+  const topeIa = Number((configBots.data as { max_costo_ia_mensual_usd?: number } | null)?.max_costo_ia_mensual_usd ?? 10);
+  const presupuesto = armarPresupuestoPanel({
+    costos: (costosMes.data ?? []) as Array<{ tipo: string; costo_usd: number; detalle: Record<string, unknown> | null }>,
+    topeUsd: topeIa,
+    botsPorId,
+  });
+  // Para el gráfico se mandan los snapshots crudos (cierres e intradía) y la pantalla arma cada rango.
+  const snapshotsGrafico: SnapshotGrafico[] = [
+    ...((cierresBots.data ?? []) as Array<{ bot_id: string | null; ts: string; valor_usd: number }>).map((fila) => ({ bot_id: fila.bot_id, ts: fila.ts, tipo: "cierre" as const, valor_usd: Number(fila.valor_usd) })),
+    ...((snapshotsBots.data ?? []) as Array<{ bot_id: string | null; ts: string; tipo: "intradia" | "cierre"; valor_usd: number }>).filter((fila) => fila.tipo === "intradia").map((fila) => ({ bot_id: fila.bot_id, ts: fila.ts, tipo: "intradia" as const, valor_usd: Number(fila.valor_usd) })),
+  ];
 
   const filasPrecios: FilaPrecioPanel[] = universo.map((ticker) => {
     const intradia = ultimoPrecio.get(ticker);
@@ -218,6 +256,9 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
       hoy,
     }),
     filings: (filings.data ?? []) as FilingPanel[],
+    comparacion,
+    grafico: { snapshots: snapshotsGrafico, botsPorId },
+    presupuesto,
     bots: armarPanelBots({
       config: configBots.data as { activo: boolean; fecha_inicio: string | null; capital_inicial_usd: number } | null,
       bots: (filasBots.data ?? []) as Parameters<typeof armarPanelBots>[0]["bots"],
