@@ -1,11 +1,15 @@
-import { esperar, fetchConTimeout, mensajeDeError } from "./http";
+import { fetchConTimeout } from "./http";
 
-// GDELT DOC 2.0: gratis y sin key, cubre medios de todo el mundo. No publica un límite fijo,
-// pero pide no pasarse de ~1 pedido cada 5 segundos, así que los temas van en serie.
+// GDELT DOC 2.0: gratis y sin key, cubre medios de todo el mundo. No publica un límite fijo, pide
+// no pasarse de ~1 pedido cada 5 segundos, y en la práctica tarda 20-40 s por pedido y a veces
+// responde 429 o corta por timeout (verificado el 2026-10-04). Por eso cada corrida consulta UN
+// solo tema, rotando, y no los siete en serie.
 const GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc";
-export const PAUSA_ENTRE_PEDIDOS_MS = 5_200;
+export const MINUTOS_POR_TEMA = 10;
 
-export const TEMAS_GLOBALES: Array<{ tema: string; consulta: string }> = [
+export type TemaGlobal = { tema: string; consulta: string };
+
+export const TEMAS_GLOBALES: TemaGlobal[] = [
   { tema: "fed", consulta: '("Federal Reserve" OR "Fed rate" OR "interest rates") sourcelang:english' },
   { tema: "inflacion", consulta: '(inflation OR "consumer prices" OR CPI) sourcelang:english' },
   { tema: "guerra", consulta: '(war OR invasion OR missile OR ceasefire) sourcelang:english' },
@@ -34,7 +38,17 @@ export function parsearArticulos(tema: string, articulos: ArticuloGdelt[]): Noti
   });
 }
 
-async function obtenerTema(tema: string, consulta: string, maxRegistros: number, ventana: string): Promise<NoticiaGlobalCruda[]> {
+// Tema que le toca a esta corrida: rota cada MINUTOS_POR_TEMA, así los 7 temas se refrescan cada ~70 min.
+export function temaDeLaCorrida(ahora: Date): TemaGlobal {
+  const turno = Math.floor(ahora.getTime() / (MINUTOS_POR_TEMA * 60_000));
+  return TEMAS_GLOBALES[turno % TEMAS_GLOBALES.length];
+}
+
+export async function obtenerNoticiasDeTema(
+  { tema, consulta }: TemaGlobal,
+  opciones: { maxRegistros?: number; ventana?: string; timeoutMs?: number } = {}
+): Promise<NoticiaGlobalCruda[]> {
+  const { maxRegistros = 10, ventana = "3h", timeoutMs = 50_000 } = opciones;
   const params = new URLSearchParams({
     query: consulta,
     mode: "artlist",
@@ -43,36 +57,14 @@ async function obtenerTema(tema: string, consulta: string, maxRegistros: number,
     timespan: ventana,
     sort: "hybridrel",
   });
-  const respuesta = await fetchConTimeout(`${GDELT_URL}?${params}`);
+  const respuesta = await fetchConTimeout(`${GDELT_URL}?${params}`, {}, timeoutMs);
   if (!respuesta.ok) throw new Error(`GDELT respondió HTTP ${respuesta.status}`);
   const texto = await respuesta.text();
-  // Cuando no hay resultados o la consulta es inválida, GDELT puede devolver texto plano en vez de JSON.
+  // Sin resultados devuelve `{}`; con una consulta inválida, texto plano en vez de JSON.
   if (!texto.trim().startsWith("{")) {
     if (!texto.trim()) return [];
     throw new Error(`GDELT: ${texto.trim().slice(0, 120)}`);
   }
   const data = JSON.parse(texto) as { articles?: ArticuloGdelt[] };
   return parsearArticulos(tema, data.articles ?? []);
-}
-
-// Recorre los temas en serie; si pasa el presupuesto de tiempo, corta y avisa cuáles quedaron afuera.
-export async function obtenerNoticiasGlobales(opciones: { maxRegistros?: number; ventana?: string; tiempoMaxMs?: number } = {}) {
-  const { maxRegistros = 6, ventana = "2h", tiempoMaxMs = 40_000 } = opciones;
-  const inicio = Date.now();
-  const noticias: NoticiaGlobalCruda[] = [];
-  const errores: Array<{ tema: string; error: string }> = [];
-  const omitidos: string[] = [];
-  for (const [indice, { tema, consulta }] of TEMAS_GLOBALES.entries()) {
-    if (Date.now() - inicio > tiempoMaxMs) {
-      omitidos.push(tema);
-      continue;
-    }
-    if (indice > 0) await esperar(PAUSA_ENTRE_PEDIDOS_MS);
-    try {
-      noticias.push(...(await obtenerTema(tema, consulta, maxRegistros, ventana)));
-    } catch (error) {
-      errores.push({ tema, error: mensajeDeError(error) });
-    }
-  }
-  return { noticias, errores, omitidos };
 }

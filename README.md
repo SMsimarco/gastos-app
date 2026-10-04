@@ -195,7 +195,7 @@ Datos de mercado para el experimento de bots simulados. Todo es gratis y no muev
 4. **`LAB_CRON_SECRET`** — `openssl rand -hex 32`. Cargalo en Vercel y en `scripts/lab-pg-cron.sql`.
 5. Aplicá la migración `0018_laboratorio_datos.sql` y ejecutá `scripts/lab-pg-cron.sql` en el SQL Editor de Supabase. Vercel Hobby solo permite crons diarios, así que la frecuencia de 15 y 30 minutos la maneja Supabase con `pg_cron` + `pg_net` (ver `NOTES.md`, Fase 6A).
 
-Para probar a mano: `curl -H "Authorization: Bearer $LAB_CRON_SECRET" https://gastosvoz.vercel.app/api/lab/macro` (primero `macro`, que carga indicadores y calendario; después `noticias` y `monitor`).
+Para probar a mano: `curl -H "Authorization: Bearer $LAB_CRON_SECRET" https://gastosvoz.vercel.app/api/lab/macro` (primero `macro`, que carga indicadores y calendario; después `noticias`, `gdelt` y `monitor`).
 
 ---
 

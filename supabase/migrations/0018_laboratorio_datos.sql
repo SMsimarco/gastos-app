@@ -99,7 +99,7 @@ create policy "lectura lab_costos_ia" on lab_costos_ia for select to authenticat
 create table lab_ejecuciones (
   id uuid primary key default gen_random_uuid(),
   ts timestamptz not null default now(),
-  tarea text not null check (tarea in ('monitor', 'noticias', 'macro')),
+  tarea text not null check (tarea in ('monitor', 'noticias', 'gdelt', 'macro')),
   ok boolean not null,
   detalle jsonb not null default '{}'::jsonb,
   error text

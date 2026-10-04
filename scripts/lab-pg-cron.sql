@@ -27,10 +27,21 @@ select cron.schedule('lab-monitor', '*/15 13-21 * * 1-5', $job$
   );
 $job$);
 
--- Noticias: cada 30 minutos, todos los días y también fuera de horario.
+-- Noticias por empresa (Alpaca) y resumen con IA de todo lo pendiente: cada 30 minutos, todos los días
+-- y también fuera de horario.
 select cron.schedule('lab-noticias', '*/30 * * * *', $job$
   select net.http_get(
     url := 'https://gastosvoz.vercel.app/api/lab/noticias',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
+    timeout_milliseconds := 58000
+  );
+$job$);
+
+-- Noticias globales (GDELT): cada 10 minutos, un tema por corrida (rotan los 7 temas). GDELT tarda
+-- 20-40 s por pedido y limita a 1 pedido cada 5 s, por eso no se consultan todos juntos.
+select cron.schedule('lab-gdelt', '*/10 * * * *', $job$
+  select net.http_get(
+    url := 'https://gastosvoz.vercel.app/api/lab/gdelt',
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),
     timeout_milliseconds := 58000
   );

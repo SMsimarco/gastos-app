@@ -3,7 +3,7 @@ import { parsearBarras, parsearNoticias, parsearSnapshots } from "./alpaca";
 import { parsearBalances } from "./finnhub";
 import { reunionesFedEntre } from "./fed";
 import { parsearObservaciones } from "./fred";
-import { fechaGdeltAIso, parsearArticulos } from "./gdelt";
+import { fechaGdeltAIso, MINUTOS_POR_TEMA, parsearArticulos, TEMAS_GLOBALES, temaDeLaCorrida } from "./gdelt";
 
 describe("alpaca", () => {
   it("parsearBarras ordena por fecha y descarta cierres inválidos", () => {
@@ -57,6 +57,22 @@ describe("gdelt", () => {
     expect(resultado).toEqual([
       { tema: "fed", titular: "La Fed mantiene tasas", url: "https://x/1", publicadoAt: "2026-10-03T12:15:30Z", dominio: "reuters.com" },
     ]);
+  });
+});
+
+describe("gdelt: rotación de temas", () => {
+  it("cada corrida de 10 minutos pasa al tema siguiente y vuelve a empezar después del último", () => {
+    const inicio = new Date("2026-10-05T12:00:00Z").getTime();
+    const temas = Array.from({ length: TEMAS_GLOBALES.length + 1 }, (_, i) =>
+      temaDeLaCorrida(new Date(inicio + i * MINUTOS_POR_TEMA * 60_000)).tema
+    );
+    expect(new Set(temas.slice(0, TEMAS_GLOBALES.length)).size).toBe(TEMAS_GLOBALES.length); // los 7 temas, sin repetir
+    expect(temas[TEMAS_GLOBALES.length]).toBe(temas[0]);
+  });
+  it("dentro de la misma ventana de 10 minutos devuelve siempre el mismo tema", () => {
+    const a = temaDeLaCorrida(new Date("2026-10-05T12:00:30Z"));
+    const b = temaDeLaCorrida(new Date("2026-10-05T12:09:30Z"));
+    expect(a.tema).toBe(b.tema);
   });
 });
 

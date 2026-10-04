@@ -75,7 +75,10 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
   const [precios, indicadores, macro, noticias, calendario, eventos, ejecuciones] = await Promise.all([
     supabase.from("lab_precios").select("ticker, ts, precio").eq("tipo", "intradia").in("ticker", universo).order("ts", { ascending: false }).limit(universo.length * 40),
     supabase.from("lab_indicadores").select("ticker, fecha, datos").in("ticker", universo).order("fecha", { ascending: false }).limit(universo.length * 2),
-    supabase.from("lab_macro").select("serie, fecha, valor").in("serie", idsMacro).order("fecha", { ascending: false }).limit(idsMacro.length * 16),
+    // Una consulta por serie: con un solo límite global, las series diarias desplazan a las mensuales (CPI, desempleo).
+    Promise.all(
+      idsMacro.map((serie) => supabase.from("lab_macro").select("serie, fecha, valor").eq("serie", serie).order("fecha", { ascending: false }).limit(16))
+    ),
     supabase
       .from("lab_noticias")
       .select("id, titular, resumen, url, fuente, ticker, tickers, tema, publicado_at, sentimiento, relevancia")
@@ -115,7 +118,7 @@ export async function obtenerPanelEnVivo(supabase: SupabaseClient, usuarioId: st
   });
 
   const macroPorSerie = new Map<string, Array<{ fecha: string; valor: number }>>();
-  for (const fila of macro.data ?? []) {
+  for (const fila of macro.flatMap((consulta) => consulta.data ?? [])) {
     macroPorSerie.set(fila.serie, [...(macroPorSerie.get(fila.serie) ?? []), { fecha: fila.fecha as string, valor: Number(fila.valor) }]);
   }
   const filasMacro = idsMacro

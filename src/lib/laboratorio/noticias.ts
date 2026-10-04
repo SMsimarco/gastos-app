@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { obtenerNoticias as obtenerNoticiasAlpaca, type NoticiaCruda } from "./fuentes/alpaca";
-import { obtenerNoticiasGlobales, type NoticiaGlobalCruda } from "./fuentes/gdelt";
+import { obtenerNoticiasDeTema, temaDeLaCorrida, type NoticiaGlobalCruda } from "./fuentes/gdelt";
 import { mensajeDeError } from "./fuentes/http";
 import { llamarGeminiJson } from "./gemini";
 import { costoLlamadaUsd, evaluarPresupuesto, inicioDeMesUtc } from "./presupuesto";
@@ -134,46 +134,44 @@ export function normalizarResumenes(respuesta: unknown, cantidad: number, univer
 
 // --- Recolección y resumen (con base de datos) ---
 
-export type ResultadoRecoleccion = {
-  nuevas: number;
-  vistas: number;
-  errores: Array<{ fuente: string; error: string }>;
-  temasOmitidos: string[];
-};
+export type ResultadoRecoleccion = { nuevas: number; vistas: number; errores: Array<{ fuente: string; error: string }> };
 
-export async function recolectarNoticias(supabase: SupabaseClient, universo: string[]): Promise<ResultadoRecoleccion> {
-  const errores: ResultadoRecoleccion["errores"] = [];
-  let empresa: NoticiaCruda[] = [];
-  let globales: NoticiaGlobalCruda[] = [];
-  let temasOmitidos: string[] = [];
+// Deduplica por URL: una noticia ya vista no se vuelve a insertar ni a resumir.
+async function guardarFilas(supabase: SupabaseClient, filas: FilaNoticia[]): Promise<number> {
+  if (filas.length === 0) return 0;
+  const { data, error } = await supabase
+    .from("lab_noticias")
+    .upsert(filas, { onConflict: "url", ignoreDuplicates: true })
+    .select("id");
+  if (error) throw new Error(`No pude guardar las noticias: ${error.message}`);
+  return data?.length ?? 0;
+}
 
-  // Las dos fuentes son independientes: si una falla, la otra sigue y el error queda registrado.
-  const [alpaca, gdelt] = await Promise.allSettled([
-    obtenerNoticiasAlpaca(universo, new Date(Date.now() - 6 * 3_600_000)),
-    obtenerNoticiasGlobales(),
-  ]);
-  if (alpaca.status === "fulfilled") empresa = alpaca.value;
-  else errores.push({ fuente: "alpaca-noticias", error: mensajeDeError(alpaca.reason) });
-  if (gdelt.status === "fulfilled") {
-    globales = gdelt.value.noticias;
-    temasOmitidos = gdelt.value.omitidos;
-    for (const fallo of gdelt.value.errores) errores.push({ fuente: `gdelt:${fallo.tema}`, error: fallo.error });
-  } else {
-    errores.push({ fuente: "gdelt", error: mensajeDeError(gdelt.reason) });
+// Noticias por empresa (Alpaca) de las últimas 6 horas.
+export async function recolectarNoticiasEmpresa(supabase: SupabaseClient, universo: string[]): Promise<ResultadoRecoleccion> {
+  try {
+    const empresa = await obtenerNoticiasAlpaca(universo, new Date(Date.now() - 6 * 3_600_000));
+    const filas = filasDeNoticias({ empresa, globales: [], universo });
+    return { nuevas: await guardarFilas(supabase, filas), vistas: filas.length, errores: [] };
+  } catch (error) {
+    return { nuevas: 0, vistas: 0, errores: [{ fuente: "alpaca-noticias", error: mensajeDeError(error) }] };
   }
+}
 
-  const filas = filasDeNoticias({ empresa, globales, universo });
-  let nuevas = 0;
-  if (filas.length > 0) {
-    // Deduplica por URL: una noticia ya vista no se vuelve a insertar ni a resumir.
-    const { data, error } = await supabase
-      .from("lab_noticias")
-      .upsert(filas, { onConflict: "url", ignoreDuplicates: true })
-      .select("id");
-    if (error) throw new Error(`No pude guardar las noticias: ${error.message}`);
-    nuevas = data?.length ?? 0;
+// Noticias globales (GDELT): el tema que le toca a esta corrida.
+export async function recolectarNoticiasGlobales(
+  supabase: SupabaseClient,
+  universo: string[],
+  ahora: Date = new Date()
+): Promise<ResultadoRecoleccion & { tema: string }> {
+  const tema = temaDeLaCorrida(ahora);
+  try {
+    const globales = await obtenerNoticiasDeTema(tema);
+    const filas = filasDeNoticias({ empresa: [], globales, universo });
+    return { tema: tema.tema, nuevas: await guardarFilas(supabase, filas), vistas: filas.length, errores: [] };
+  } catch (error) {
+    return { tema: tema.tema, nuevas: 0, vistas: 0, errores: [{ fuente: `gdelt:${tema.tema}`, error: mensajeDeError(error) }] };
   }
-  return { nuevas, vistas: filas.length, errores, temasOmitidos };
 }
 
 export type ResultadoResumen = {

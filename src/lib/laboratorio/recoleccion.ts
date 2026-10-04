@@ -7,9 +7,9 @@ import { obtenerSerieFred, SERIES_MACRO } from "./fuentes/fred";
 import { mensajeDeError } from "./fuentes/http";
 import { calcularIndicadores } from "./indicadores";
 import { CONFIG_MONITOR_DEFAULT, detectarEventos } from "./monitor";
-import { recolectarNoticias, resumirNoticiasPendientes } from "./noticias";
+import { recolectarNoticiasEmpresa, recolectarNoticiasGlobales, resumirNoticiasPendientes } from "./noticias";
 
-export type TareaLab = "monitor" | "noticias" | "macro";
+export type TareaLab = "monitor" | "noticias" | "gdelt" | "macro";
 
 // Cada corrida deja registro (también si falla): nunca se reintenta en loop, y el panel puede
 // avisar qué fuente no respondió.
@@ -127,13 +127,20 @@ export async function ejecutarMonitor(supabase: SupabaseClient) {
 
 export async function ejecutarNoticias(supabase: SupabaseClient) {
   const contexto = await leerContextoLab(supabase);
-  const recoleccion = await recolectarNoticias(supabase, contexto.universo);
+  const recoleccion = await recolectarNoticiasEmpresa(supabase, contexto.universo);
   const resumen = await resumirNoticiasPendientes(supabase, {
     universo: contexto.universo,
     modelo: contexto.modeloResumen,
     topeIaUsd: contexto.topeIaUsd,
   });
   return { recoleccion, resumen };
+}
+
+// --- Noticias globales (cada 10 min, un tema por corrida) ---
+
+export async function ejecutarNoticiasGlobales(supabase: SupabaseClient) {
+  const contexto = await leerContextoLab(supabase);
+  return { recoleccion: await recolectarNoticiasGlobales(supabase, contexto.universo) };
 }
 
 // --- Diaria: indicadores, macro y calendario (después del cierre) ---
