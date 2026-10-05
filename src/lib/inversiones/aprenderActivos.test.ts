@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mensajeFueraDeLaboratorio, tipoDeTicker, validarActivoAprender, validarPesos } from "./aprenderActivos";
+import { mensajeFueraDeLaboratorio, tesisPendiente, TESIS_PENDIENTE, tipoDeTicker, validarActivoAprender, validarPesos } from "./aprenderActivos";
 
 const tesisOk = "Empresa de consumo estable que paga dividendo";
 
@@ -12,6 +12,13 @@ describe("validarActivoAprender", () => {
   it("la tesis es obligatoria", () => {
     expect(validarActivoAprender({ ticker: "KO", tesis: "  ", tomaGananciaPct: 30 }).ok).toBe(false);
     expect(validarActivoAprender({ ticker: "KO", tesis: "corta", tomaGananciaPct: 30 }).ok).toBe(false);
+  });
+
+  it("el texto de relleno no cuenta como tesis", () => {
+    expect(tesisPendiente(TESIS_PENDIENTE)).toBe(true);
+    expect(tesisPendiente("")).toBe(true);
+    expect(tesisPendiente(tesisOk)).toBe(false);
+    expect(validarActivoAprender({ ticker: "KO", tesis: TESIS_PENDIENTE, tomaGananciaPct: 30 }).ok).toBe(false);
   });
 
   it("pide al menos una toma de ganancia o un umbral de revisión", () => {
