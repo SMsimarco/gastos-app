@@ -20,6 +20,11 @@ export type ConfigPlanRow = {
   anios_transicion: number;
   inflacion_mensual_pct: number | null;
   rendimiento_anual_supuesto: number;
+  peso_valuacion: number;
+  peso_momento: number;
+  peso_calidad: number;
+  peso_noticias: number;
+  usar_historial_bots: boolean;
 };
 
 const CONFIG_DEFAULT: Omit<ConfigPlanRow, "usuario_id"> = {
@@ -35,6 +40,11 @@ const CONFIG_DEFAULT: Omit<ConfigPlanRow, "usuario_id"> = {
   anios_transicion: 3,
   inflacion_mensual_pct: null,
   rendimiento_anual_supuesto: 0.07,
+  peso_valuacion: 30,
+  peso_momento: 25,
+  peso_calidad: 25,
+  peso_noticias: 20,
+  usar_historial_bots: false,
 };
 
 export async function obtenerConfigPlan(
@@ -119,6 +129,7 @@ export async function calcularRepartoParaUsuario(
       gastos: saldo("gastos"),
       emergencia: saldo("emergencia"),
       porInvertir: saldo("por_invertir"),
+      aprender: saldo("aprender"),
     },
     gastoMensualArs: gastoMensual.valor,
     tcReferencia: tcGuardado,

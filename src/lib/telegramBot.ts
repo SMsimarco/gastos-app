@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { procesarEntradaFinanciera, type ResultadoCaptura } from "@/lib/capturaFinanciera";
 import { obtenerContextoInversiones, responderConsultaInversiones } from "@/lib/inversiones/consultasInversiones";
+import { enviarAvisosAprender } from "@/lib/inversiones/aprenderAvisos";
 import { aplicarRepartoUsuario, descartarRepartoUsuario, obtenerUltimoMep, resumenRepartoTexto } from "@/lib/planData";
 import { descargarArchivoTelegram, enviarMensajeTelegram, responderCallbackTelegram, tecladoRepartoTelegram } from "@/lib/telegram";
 
@@ -79,6 +80,7 @@ async function procesarCallback(supabase: SupabaseClient, update: TelegramUpdate
     await aplicarRepartoUsuario(supabase, vinculo.usuario_id, repartoId, tc);
     await responderCallbackTelegram(callback.id, "Aplicado");
     await enviarMensajeTelegram(chatId, "✅ Reparto aplicado a tus bolsillos.");
+    await enviarAvisosAprender(supabase, vinculo.usuario_id);
   } catch (error) {
     await responderCallbackTelegram(callback.id, error instanceof Error ? error.message.slice(0, 180) : "No pude hacerlo");
   }

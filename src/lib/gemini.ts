@@ -219,7 +219,7 @@ Antes que nada, decidí la intención del mensaje:
 - "operacion": compró, vendió o cobró un dividendo de una inversión (por ejemplo, "compré 125 dólares de VOO a 703").
 - "consulta_inversiones": pregunta por valor, rendimiento o composición de su cartera o un activo (por ejemplo, "¿cuánto me rinde VOO?" o "¿cuánto tengo en total?").
 - "consulta_plan": pregunta por bolsillos, fondo de emergencia, metas o avance hacia el departamento.
-- "pedir_sugerencia": pide consejo o una acción (por ejemplo, "¿qué hago con esta plata?" o "¿me conviene comprar YPF?").
+- "pedir_sugerencia": pide consejo o una acción (por ejemplo, "¿qué hago con esta plata?" o "¿me conviene comprar YPF?", o pregunta por el bolsillo "aprender" y sus sugerencias: "¿qué hago con lo de aprender?", "¿por qué me sugerís MSFT?", "¿por qué no NVDA?").
 
 Para una operación extraé únicamente datos que el usuario haya dicho: ticker, monto total en USD, precio unitario en USD, cantidad, comisión y fecha. No calcules cantidad, montos ni rendimientos. Si falta ticker, monto o precio en una compra/venta, usá 0 para el dato faltante y confianza "baja". La comisión es 0 si no se menciona.
 Para las tres consultas financieras, copiá la pregunta, extraé el ticker solo si se menciona explícitamente y evaluá confianza sobre la intención. No respondas la pregunta ni calcules nada.
@@ -356,4 +356,21 @@ Respuesta base calculada por el código: ${input.respuestaBase}`;
   if (!input.esSugerencia) return respuesta;
   const sinCierre = respuesta.replaceAll(cierre, "").trim();
   return `${sinCierre}\n${cierre}`;
+}
+
+// Asesor de aprender: Gemini solo redacta a partir de los hechos que armó el código (aprender.ts). Si falla, devuelve
+// el texto base. Quien llama valida el resultado (validarTextoAprender) y usa el texto base si no pasa.
+export async function redactarTextoAprenderIA(input: { instruccion: string; hechos: Record<string, unknown>; textoBase: string }): Promise<string> {
+  const prompt = `${input.instruccion}
+
+Redactá el mensaje usando EXCLUSIVAMENTE los hechos JSON. No agregues ningún número que no esté literalmente en los hechos.
+Hechos JSON: ${JSON.stringify(input.hechos)}
+Texto base calculado por el código (mismo contenido, tono más seco): ${input.textoBase}`;
+  const schema = { type: "OBJECT", properties: { texto: { type: "STRING" } }, required: ["texto"] };
+  try {
+    const data = await generarJSON([{ text: prompt }], schema);
+    return String(data.texto ?? input.textoBase).trim() || input.textoBase;
+  } catch {
+    return input.textoBase;
+  }
 }

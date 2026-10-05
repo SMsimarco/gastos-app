@@ -17,6 +17,8 @@ PERMITIDOS=(
   "src/app/api/gmail/revisar-ahora/route.ts"
   # Webhook externo: valida TELEGRAM_WEBHOOK_SECRET y resuelve usuario_id por chat_id.
   "src/app/api/telegram/webhook/route.ts"
+  # Fase 7: tras aplicar un reparto avisa de aprender (push + Telegram); filtra por el usuario_id de la sesion.
+  "src/app/api/plan/repartos/[id]/aplicar/route.ts"
   # Laboratorio (SIMULADO): los llama pg_cron con LAB_CRON_SECRET y escriben tablas globales de mercado (sin usuario_id).
   "src/app/api/lab/monitor/route.ts"
   "src/app/api/lab/noticias/route.ts"

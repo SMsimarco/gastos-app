@@ -38,6 +38,8 @@ const eslintConfig = defineConfig([
       "src/app/api/gmail/revisar-ahora/route.ts",
       // Webhook externo auditado: valida el secreto y deriva usuario_id del chat vinculado.
       "src/app/api/telegram/webhook/route.ts",
+      // Fase 7: tras aplicar un reparto avisa de aprender; filtra por el usuario_id de la sesión.
+      "src/app/api/plan/repartos/[[]id[]]/aplicar/route.ts",
       // Laboratorio (SIMULADO): endpoints de recolección con LAB_CRON_SECRET, escriben tablas globales de mercado.
       "src/app/api/lab/monitor/route.ts",
       "src/app/api/lab/noticias/route.ts",

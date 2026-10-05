@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { crearClienteServidor } from "@/lib/supabase/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { crearClienteServicio, crearClienteServidor } from "@/lib/supabase/server";
+import { enviarAvisosAprender } from "@/lib/inversiones/aprenderAvisos";
 import { aplicarRepartoUsuario } from "@/lib/planData";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,7 +16,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   try {
-    return NextResponse.json(await aplicarRepartoUsuario(supabase, user.id, id, tcUsado));
+    const resultado = await aplicarRepartoUsuario(supabase, user.id, id, tcUsado);
+    // Después de responder: si aprender llegó al mínimo, avisa por push y Telegram. Usa service_role porque manda
+    // push y escribe alertas_enviadas; filtra siempre por el usuario_id de la sesión. Nunca rompe el reparto.
+    after(async () => {
+      await enviarAvisosAprender(crearClienteServicio(), user.id);
+    });
+    return NextResponse.json(resultado);
   } catch (error) {
     const mensaje = error instanceof Error ? error.message : "No pude aplicar el reparto";
     return NextResponse.json({ error: mensaje }, { status: mensaje === "No encontrado" ? 404 : 409 });

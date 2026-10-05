@@ -48,3 +48,15 @@ solo pueden leerlas (policy `select` para `authenticated`, sin policies de escri
 configuración por usuario (`lab_config`) tiene RLS `auth.uid() = usuario_id`. Ninguna tabla `lab_`
 referencia el plan real. Las rutas están en la allowlist de `scripts/check-rls.sh` y de
 `eslint.config.mjs`. `GET /api/laboratorio` (el panel) usa el cliente del usuario con RLS.
+
+## Asesor de aprender (Fase 7)
+
+- `src/app/api/cron/aprender-diario/route.ts` está bajo `cron/`, pero lo llama `pg_cron` de Supabase con
+  `Authorization: Bearer $LAB_CRON_SECRET` (mismo secreto y misma comparación en tiempo constante que `/api/lab/*`), no
+  con `CRON_SECRET`. Usa `crearClienteServicio` y filtra por `usuario_id` en cada consulta. No escribe ninguna tabla `lab_*`.
+- `src/app/api/plan/repartos/[id]/aplicar/route.ts` usa `crearClienteServicio` **solo** dentro de `after()`, para mandar el
+  aviso de aprender (push + Telegram + `alertas_enviadas`) del usuario de la sesión. Está en la allowlist de
+  `scripts/check-rls.sh` y de `eslint.config.mjs`. El reparto en sí sigue usando el cliente del usuario con RLS.
+- Las rutas `/api/aprender/*` usan `crearClienteServidor` (RLS). Tablas nuevas, todas con RLS: `aprender_sugerencias`,
+  `aprender_resultados`, `aprender_propuestas_pesos` (`auth.uid() = usuario_id`) y `aprender_pe_promedio` (dato de mercado
+  global: lectura para `authenticated`, escritura solo del job con `service_role`).

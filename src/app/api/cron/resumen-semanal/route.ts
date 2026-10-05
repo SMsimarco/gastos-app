@@ -4,6 +4,7 @@ import { esDomingoEnArgentina, DISCLAIMER_FINANCIERO } from "@/lib/inversiones/a
 import { obtenerContextoInversiones } from "@/lib/inversiones/consultasInversiones";
 import { enviarMensajeTelegram } from "@/lib/telegram";
 import { resumenSemanalLab } from "@/lib/laboratorio/bots/avisos";
+import { resumenSemanalAprender } from "@/lib/inversiones/aprenderResumen";
 
 export async function GET(request: NextRequest) {
   if (request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -24,11 +25,14 @@ export async function GET(request: NextRequest) {
         ? Math.min(100, (contexto.cartera.total.valorUsd / Number(contexto.config.monto_objetivo_depto_usd)) * 100) : null;
       // Tabla de posiciones del laboratorio simulado (si está activo). Si falla, el resumen sale igual.
       const lineasLab = await resumenSemanalLab(supabase, vinculo.usuario_id).catch(() => []);
+      // Sección "Aprender" (Fase 7). Si falla, el resumen sale igual.
+      const lineasAprender = await resumenSemanalAprender(supabase, vinculo.usuario_id).catch(() => []);
       const texto = [
         "📊 Resumen semanal",
         `Gastos: $${Math.round(gastoSemana).toLocaleString("es-AR")} (${promedioSemana > 0 ? `${gastoSemana <= promedioSemana ? "dentro" : "por encima"} del promedio semanal` : "sin promedio configurado"}).`,
         `Cartera: US$${contexto.cartera.total.valorUsd.toFixed(2)} · ganancia acumulada ${contexto.cartera.total.gananciaPct.toFixed(2)}%.`,
         pctDepto === null ? "Objetivo depto: falta cargar el monto objetivo." : `Objetivo depto: ${pctDepto.toFixed(1)}% alcanzado.`,
+        ...(lineasAprender.length > 0 ? ["", ...lineasAprender] : []),
         ...(lineasLab.length > 0 ? ["", ...lineasLab] : []),
         "",
         DISCLAIMER_FINANCIERO,

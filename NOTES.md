@@ -260,3 +260,44 @@ Cierra el diseño de la Fase 6: la pestaña Lab responde con números las tres p
 
 **Verificación** (base descartable con las migraciones 0018 a 0022 y 4 días de snapshots sembrados): todo coincide con el cálculo a mano. Netos de IA A +3,95%, B +1,96%, C +0,99% y VOO +1,20% (tabla en ese orden: A, B, VOO, C); reaccionar +1,99 puntos con 1 operación más y US$0,10 más de IA; más información +0,97 puntos con US$0,30 más de IA; contra VOO A +2,75, B +0,76 y C −0,21; caída máxima de A 0,97%; el bot A con 2 operaciones y 50% ganando, el B con 1 y 100%; presupuesto US$0,592 de US$10 (5,9%). La pantalla completa se renderizó del lado servidor con todas las secciones. **Sin ver todavía:** el gráfico dibujado en un navegador real (se verificó con tests la lógica que arma las series, no el dibujo) y datos reales de los bots (empiezan a llegar con las primeras ruedas).
 
+
+## Fase 7: asesor del bolsillo "aprender" (2026-10-05, migración 0023)
+
+Ayuda a usar bien el 5% de cada cobro. **Solo** mira el bolsillo `aprender`: nunca sugiere tocar emergencia, gastos ni largo plazo, ni vender VOO (hay un test que lo verifica). Yo decido y ejecuto a mano en ARQ. El código elige y calcula todo (`src/lib/inversiones/aprender.ts`, puro, con tests); Gemini solo redacta con esos números y, si algo de lo que escribe no pasa las reglas (largo, palabras prohibidas, opción de esperar, descargo, un número que no estaba en los hechos), se usa la plantilla del código. Toda sugerencia termina con "Sugerencia según tu plan, no asesoramiento financiero." El laboratorio no se tocó (`git diff master -- src/lib/laboratorio` está vacío): se lee de las tablas `lab_*` y las decisiones de los bots **no** se usan como señal.
+
+**Cambio en el reparto.** Antes, si el 5% de un cobro quedaba debajo del mínimo (US$100) se sumaba a "Por invertir" y se mezclaba con largo plazo, así que el bolsillo `aprender` casi nunca se llenaba. Ahora **aprender se acumula en su propio bolsillo** (`calcularReparto` recibe el saldo de aprender y dice cuánto falta); el mínimo se aplica al saldo acumulado, no a cada cobro. Largo plazo sigue acumulándose en Por invertir como antes.
+
+### Puntaje (de -100 a +100, transparente)
+Cada componente da un valor entre -1 y +1, se multiplica por su peso y la **suma de los aportes es el puntaje**. Pesos por defecto (en `config_plan`, editables desde la UI; suman 100): valuación 30, momento 25, calidad 25, noticias 20. Si un componente no tiene dato (por ejemplo los ETF no tienen P/E), su peso se reparte entre los demás para que el puntaje siga yendo de -100 a +100; la ficha lo muestra como "sin dato". El riesgo se marca pero no suma ni resta.
+
+| Criterio | Dato | Escala (-1 a +1) | Por qué |
+|---|---|---|---|
+| Valuación | P/E contra su promedio de 5 años | 40% más barata que su promedio = +1, 40% más cara = -1 | Pagar menos que de costumbre por la misma empresa |
+| Momento | Distancia al máximo de 52 semanas y precio contra media de 200 días (promedio de los dos) | Máximo: -0,5; 20% abajo: +1. Media de 200 días: debajo cae hasta -1 en -20%; de 0 a +15% sube hasta +1; se enfría hasta 0 en +40% | Preferir lo que viene de una baja con tendencia sana a lo que ya corrió |
+| Calidad | Crecimiento de ingresos y margen neto (Finnhub) | Crecimiento: 0% = 0, 20% = +1. Margen: 5% = 0, 25% = +1 | Una empresa que crece y gana plata |
+| Noticias | Sentimiento promedio de 7 días (mínimo 3 noticias) | -0,5 a +0,5 = -1 a +1 | Contexto reciente |
+| Riesgo | Volatilidad de 20 días (>40% anual se marca) y balance en 7 días | Solo marca | Avisar, no puntuar |
+
+Los pesos son un punto de partida razonable, no una verdad: por eso se miden (ver "Qué aprende") y solo cambian con mi OK.
+
+### Exclusiones y concentración
+Se excluye (con motivo y "qué tendría que cambiar") un ticker con **balance en menos de 3 días**, **sin precio** del laboratorio de los últimos 5 días, **sin ningún dato**, o que ya sea más del 50% del bolsillo aprender. No se sugiere sumar a un ticker si sumarle el saldo lo dejaría con más de 50% del bolsillo. **Límite que conviene saber:** la concentración solo se mide cuando el bolsillo ya tiene posiciones; en la primera compra no hay con qué diversificar y se sugiere con el saldo completo. Siempre 2-3 candidatos (si menos de 2 pasan los filtros lo dice) más "esperar / sumar a VOO". Bajo el mínimo solo dice cuánto falta. Toma de ganancia y revisión de tesis reutilizan las reglas 4 y 5 de `sugerencias.ts` (`evaluarObjetivoGanancia`, `evaluarRevisionTesis`).
+
+### Datos
+Todo de `lab_*` (solo lectura, con el cliente del usuario): precios, indicadores (media de 200 días, distancia al máximo, volatilidad), fundamentales (P/E, crecimiento, margen), noticias de 7 días y calendario de balances. **Excepción acordada:** el laboratorio guarda solo el P/E actual, así que el promedio de P/E de 5 años se calcula con la serie trimestral de Finnhub (`peTTM`, 5 años, mínimo 12 trimestres) en el job diario, una vez por semana y solo para los tickers de la lista, y se guarda en su propia tabla `aprender_pe_promedio`. Sin laboratorio tocado y sin cron de recolección nuevo. Solo se pueden agregar a la lista tickers que el laboratorio ya siga (si no, la app lo explica): sumar uno nuevo al universo del laboratorio cambiaría lo que pueden operar los bots y es una decisión aparte.
+
+### Avisos
+- Después de aplicar un reparto (desde la app o desde Telegram), si el saldo de aprender llega al mínimo: push y Telegram con 2-3 opciones y la opción de esperar. Un fallo del aviso nunca rompe el reparto.
+- Máximo **1 aviso de aprender por semana**; toma de ganancia y revisión de tesis salen aparte pero no más de una vez por semana por activo. Todo con `alertas_enviadas` (claves `aprender-aviso:` y `aprender-alerta:`), reservando antes de enviar.
+- Resumen semanal del domingo: sección "Aprender" con saldo, cada posición contra VOO en el mismo período, lo que haya para revisar y una línea de lo que aprendió esa semana.
+- Tono en criollo (vos, frases cortas, conclusión primero, máximo 5 líneas con link, los dos lados, siempre la opción de esperar, sin euforia ni miedo). Palabras prohibidas con test: "oportunidad única", "seguro", "garantizado", "no podés perder".
+
+### Qué aprende
+Job diario (`/api/cron/aprender-diario`, `pg_cron` a las 22:40 UTC los días hábiles, después del cierre del laboratorio; usa `LAB_CRON_SECRET`): refresca el P/E promedio, guarda la evaluación de la semana (**en silencio**, `de_sombra = true`, si el saldo no llega al mínimo, para ir midiendo igual), completa qué tickers compré, **mide cada candidato a 1, 4 y 12 semanas contra VOO** (lo haya comprado o no; precios de cierre de `lab_precios`), manda los avisos pendientes y una vez por mes calcula una propuesta de pesos. Un criterio "acierta" cuando sumó en la sugerencia y ese ticker le ganó a VOO (el historial usa el horizonte de 4 semanas). **Los pesos no cambian solos:** con 30 casos o más por criterio y una diferencia clara (20 puntos porcentuales contra el promedio) la app propone mover 5 puntos hacia el que más acertó (nunca bajar un peso de 5) y yo acepto o rechazo desde la UI. Con menos de 30 casos todo se muestra con la advertencia "puede ser suerte".
+
+### UI y consultas
+Sección "Aprender" en la pestaña **Plan**, debajo de los bolsillos (ahí aplico el reparto y veo el saldo; Cartera queda para posiciones): saldo y progreso al mínimo, opciones de hoy con la ficha "¿por qué?" (criterio, dato, contra qué se compara, aporte, en criollo, fuente y fecha, historial del criterio, noticias usadas), comparación lado a lado con VOO, "qué tendría que cambiar", "por qué no los demás", rendimiento contra "si lo hubiera puesto en VOO", lista de activos (agregar con tesis obligatoria, editar, quitar), lo que va aprendiendo, propuestas de pesos y edición de pesos. Consultas por chat/Telegram: "¿qué hago con lo de aprender?" / "¿cómo viene aprender?", "¿por qué me sugerís MSFT?", "¿por qué no NVDA?", "¿qué tiene que pasar para que compre KO?" (detectadas por palabras clave antes del flujo normal; las fichas de ticker se devuelven tal cual las calculó el código).
+
+### Pendiente / límites
+- `usar_historial_bots` existe en `config_plan` (default `false`) pero **todavía no cambia el puntaje**: está reservado para cuando se decida usar las decisiones de los bots como señal.
+- Las consultas dependen de que el clasificador de Gemini las mande al flujo de inversiones; se le agregaron ejemplos al prompt, pero no está probado con mensajes reales.

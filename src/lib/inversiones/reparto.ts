@@ -60,7 +60,7 @@ function validarEntrada(input: {
 
 export function calcularReparto(input: {
   montoIngresoArs: number;
-  saldos: { gastos: number; emergencia: number; porInvertir?: number };
+  saldos: { gastos: number; emergencia: number; porInvertir?: number; aprender?: number };
   gastoMensualArs: number;
   tcReferencia: number;
   config: ConfigReparto;
@@ -99,7 +99,7 @@ export function calcularReparto(input: {
   let largoPlazo = pesoInversion > 0
     ? redondearCentavos((paraInvertirUsd * config.pctLargoPlazo) / pesoInversion)
     : 0;
-  let aprender = redondearCentavos(paraInvertirUsd - largoPlazo);
+  const aprender = redondearCentavos(paraInvertirUsd - largoPlazo);
   let porInvertir = 0;
 
   if (largoPlazo > 0 && largoPlazo < config.minimoCompraUsd) {
@@ -107,10 +107,12 @@ export function calcularReparto(input: {
     explicacion.push(`Largo plazo queda debajo de US$${config.minimoCompraUsd.toFixed(2)} y se acumula en Por invertir.`);
     largoPlazo = 0;
   }
-  if (aprender > 0 && aprender < config.minimoCompraUsd) {
-    porInvertir = redondearCentavos(porInvertir + aprender);
-    explicacion.push(`Aprender queda debajo de US$${config.minimoCompraUsd.toFixed(2)} y se acumula en Por invertir.`);
-    aprender = 0;
+  // Aprender se acumula en su propio bolsillo hasta llegar al mínimo (no se mezcla con Por invertir).
+  // El mínimo se aplica al saldo acumulado: recién ahí el asesor sugiere candidatos.
+  const saldoAprenderPrevio = Math.max(0, saldos.aprender ?? 0);
+  const saldoAprenderNuevo = redondearCentavos(saldoAprenderPrevio + aprender);
+  if (aprender > 0 && saldoAprenderNuevo < config.minimoCompraUsd) {
+    explicacion.push(`Aprender se acumula: llevás US$${saldoAprenderNuevo.toFixed(2)} de US$${config.minimoCompraUsd.toFixed(2)} para poder invertir.`);
   }
 
   const asignadoUsd = redondearCentavos(emergencia + largoPlazo + aprender + porInvertir);
@@ -121,7 +123,13 @@ export function calcularReparto(input: {
   }
 
   if (largoPlazo > 0) acciones.push(`Comprá US$${largoPlazo.toFixed(2)} de VOO en ARQ.`);
-  if (aprender > 0) acciones.push(`Destiná US$${aprender.toFixed(2)} a un activo de tu lista para aprender.`);
+  if (aprender > 0) {
+    acciones.push(
+      saldoAprenderNuevo >= config.minimoCompraUsd
+        ? `Dejá US$${aprender.toFixed(2)} en Aprender; el saldo queda en US$${saldoAprenderNuevo.toFixed(2)} y ya podés elegir un activo de tu lista.`
+        : `Dejá US$${aprender.toFixed(2)} en Aprender; el saldo queda en US$${saldoAprenderNuevo.toFixed(2)} (faltan US$${redondearCentavos(config.minimoCompraUsd - saldoAprenderNuevo).toFixed(2)} para invertir).`
+    );
+  }
   if (porInvertir > 0) {
     const acumulado = redondearCentavos((saldos.porInvertir ?? 0) + porInvertir);
     acciones.push(`Dejá US$${porInvertir.toFixed(2)} en Por invertir; el saldo quedaría en US$${acumulado.toFixed(2)}.`);

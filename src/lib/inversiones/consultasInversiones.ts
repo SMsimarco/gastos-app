@@ -64,6 +64,12 @@ export async function responderConsultaInversiones(
   tipo: TipoConsultaInversion,
   consulta: ConsultaFinancieraExtraida
 ): Promise<string> {
+  // Preguntas sobre el bolsillo aprender ("¿qué hago con lo de aprender?", "¿por qué me sugerís MSFT?"): las responde
+  // el asesor de aprender con sus fichas. Import dinámico para no cerrar un ciclo con aprenderDatos.
+  const { responderConsultaAprender } = await import("./aprenderConsultas");
+  const respuestaAprender = await responderConsultaAprender(supabase, usuarioId, consulta.pregunta, consulta.ticker);
+  if (respuestaAprender) return respuestaAprender;
+
   const { cartera, config, gastoMensual, bolsillos, repartoPendiente, activosPolitica, emergencia, metaEmergenciaUsd, estado } =
     await obtenerContextoInversiones(supabase, usuarioId);
 

@@ -31,6 +31,27 @@ export type Sugerencia = {
 const usd = (valor: number) => valor.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (valor: number) => valor.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 
+// Reglas 4 y 5 de un activo del bolsillo aprender. Las reutiliza el asesor de aprender (aprender.ts).
+export function evaluarObjetivoGanancia(activo: ActivoSugerencias): Sugerencia | null {
+  if (activo.tomaGananciaPct === null || activo.gananciaPct < activo.tomaGananciaPct) return null;
+  return {
+    tipo: "objetivo_ganancia",
+    prioridad: 400,
+    mensaje: `${activo.ticker} llegó a tu objetivo de +${pct(activo.tomaGananciaPct)}%: tu regla es tomar ganancia acá.`,
+    datos: { ticker: activo.ticker, gananciaPct: activo.gananciaPct, objetivoPct: activo.tomaGananciaPct },
+  };
+}
+
+export function evaluarRevisionTesis(activo: ActivoSugerencias): Sugerencia | null {
+  if (activo.stopRevisionPct === null || activo.gananciaPct > -Math.abs(activo.stopRevisionPct)) return null;
+  return {
+    tipo: "revisar_tesis",
+    prioridad: 300,
+    mensaje: `${activo.ticker} bajó más de ${pct(Math.abs(activo.stopRevisionPct))}%: revisá si tu tesis sigue siendo válida.`,
+    datos: { ticker: activo.ticker, gananciaPct: activo.gananciaPct, umbralPct: activo.stopRevisionPct },
+  };
+}
+
 export function generarSugerencias(estado: EstadoInversiones): Sugerencia[] {
   const sugerencias: Sugerencia[] = [];
   const faltanteEmergencia = Math.max(0, estado.emergencia.metaUsd - estado.emergencia.saldoUsd);
@@ -67,22 +88,10 @@ export function generarSugerencias(estado: EstadoInversiones): Sugerencia[] {
   }
 
   for (const activo of estado.activos.filter((item) => item.bolsilloClave === "aprender")) {
-    if (activo.tomaGananciaPct !== null && activo.gananciaPct >= activo.tomaGananciaPct) {
-      sugerencias.push({
-        tipo: "objetivo_ganancia",
-        prioridad: 400,
-        mensaje: `${activo.ticker} llegó a tu objetivo de +${pct(activo.tomaGananciaPct)}%: tu regla es tomar ganancia acá.`,
-        datos: { ticker: activo.ticker, gananciaPct: activo.gananciaPct, objetivoPct: activo.tomaGananciaPct },
-      });
-    }
-    if (activo.stopRevisionPct !== null && activo.gananciaPct <= -Math.abs(activo.stopRevisionPct)) {
-      sugerencias.push({
-        tipo: "revisar_tesis",
-        prioridad: 300,
-        mensaje: `${activo.ticker} bajó más de ${pct(Math.abs(activo.stopRevisionPct))}%: revisá si tu tesis sigue siendo válida.`,
-        datos: { ticker: activo.ticker, gananciaPct: activo.gananciaPct, umbralPct: activo.stopRevisionPct },
-      });
-    }
+    const objetivo = evaluarObjetivoGanancia(activo);
+    if (objetivo) sugerencias.push(objetivo);
+    const revision = evaluarRevisionTesis(activo);
+    if (revision) sugerencias.push(revision);
   }
 
   if (estado.fechaObjetivoDepto) {
