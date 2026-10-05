@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mensajeFueraDeLaboratorio, tesisPendiente, TESIS_PENDIENTE, tipoDeTicker, validarActivoAprender, validarPesos } from "./aprenderActivos";
+import { compraBloqueadaPorTesis, mensajeFueraDeLaboratorio, tesisPendiente, TESIS_PENDIENTE, tipoDeTicker, validarActivoAprender, validarPesos } from "./aprenderActivos";
 
 const tesisOk = "Empresa de consumo estable que paga dividendo";
 
@@ -51,5 +51,19 @@ describe("validarPesos", () => {
     expect(validarPesos({ valuacion: 40, momento: 20, calidad: 20, noticias: 10 }).ok).toBe(false);
     expect(validarPesos({ valuacion: 40.5, momento: 19.5, calidad: 20, noticias: 20 }).ok).toBe(false);
     expect(validarPesos({ valuacion: -10, momento: 50, calidad: 30, noticias: 30 }).ok).toBe(false);
+  });
+});
+
+describe("compraBloqueadaPorTesis", () => {
+  it("bloquea comprar un activo de aprender sin tesis propia, y solo comprar", () => {
+    const sinTesis = { ticker: "KO", bolsillo_clave: "aprender", tesis: TESIS_PENDIENTE };
+    expect(compraBloqueadaPorTesis(sinTesis, "compra")).toContain("escribí tu tesis");
+    expect(compraBloqueadaPorTesis({ ...sinTesis, tesis: null }, "compra")).not.toBeNull();
+    expect(compraBloqueadaPorTesis(sinTesis, "venta")).toBeNull();
+    expect(compraBloqueadaPorTesis(sinTesis, "dividendo")).toBeNull();
+  });
+  it("no bloquea con tesis escrita ni activos de otros bolsillos (VOO no pide tesis)", () => {
+    expect(compraBloqueadaPorTesis({ ticker: "KO", bolsillo_clave: "aprender", tesis: "Consumo estable que paga dividendo" }, "compra")).toBeNull();
+    expect(compraBloqueadaPorTesis({ ticker: "VOO", bolsillo_clave: "largo_plazo", tesis: null }, "compra")).toBeNull();
   });
 });
