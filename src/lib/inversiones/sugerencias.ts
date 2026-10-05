@@ -31,6 +31,13 @@ export type Sugerencia = {
 const usd = (valor: number) => valor.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (valor: number) => valor.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 
+// Regla de la Fase 4 para VOO: aviso si cae 10% o más desde su máximo de 52 semanas (oportunidad de compra de largo
+// plazo, nunca una señal de venta). La reutilizan los avisos de empresas grandes.
+export const UMBRAL_VOO_BAJO_MAXIMO_PCT = 10;
+export function caidaDesdeMaximoPct(precioActual: number, max52s: number): number {
+  return max52s > 0 ? ((max52s - precioActual) / max52s) * 100 : 0;
+}
+
 // Reglas 4 y 5 de un activo del bolsillo aprender. Las reutiliza el asesor de aprender (aprender.ts).
 export function evaluarObjetivoGanancia(activo: ActivoSugerencias): Sugerencia | null {
   if (activo.tomaGananciaPct === null || activo.gananciaPct < activo.tomaGananciaPct) return null;
@@ -76,8 +83,8 @@ export function generarSugerencias(estado: EstadoInversiones): Sugerencia[] {
 
   const voo = estado.activos.find((activo) => activo.ticker === "VOO");
   if (voo?.precioActualUsd && voo.max52sUsd && voo.max52sUsd > 0 && estado.porInvertirUsd > 0) {
-    const caidaPct = ((voo.max52sUsd - voo.precioActualUsd) / voo.max52sUsd) * 100;
-    if (caidaPct >= 10) {
+    const caidaPct = caidaDesdeMaximoPct(voo.precioActualUsd, voo.max52sUsd);
+    if (caidaPct >= UMBRAL_VOO_BAJO_MAXIMO_PCT) {
       sugerencias.push({
         tipo: "voo_bajo_maximo",
         prioridad: 500,

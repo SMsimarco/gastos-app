@@ -6,12 +6,14 @@
 // 4) mide las sugerencias a 1, 4 y 12 semanas contra VOO
 // 5) una vez por mes, propone (nunca aplica) un cambio de pesos
 // 6) manda avisos pendientes (toma de ganancia, revisión, saldo suficiente)
+// 7) resumen diario y alertas de empresas grandes (empresasFuertesAvisos.ts)
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { evaluarCandidatos, type EstadoAprender } from "./aprender";
 import { enviarAvisosAprender, registrarSugerencia } from "./aprenderAvisos";
 import { cargarEstadoAprender, cargarHistorialAprender } from "./aprenderDatos";
 import { descripcionPropuesta, medicionesPendientes, proponerCambioPesos, type PuntoPrecio, type SugerenciaGuardada } from "./aprenderHistorial";
 import { obtenerPromedioPe5a } from "./aprenderPe";
+import { enviarAvisosEmpresasFuertes } from "./empresasFuertesAvisos";
 
 const DIAS_PE_VIGENTE = 7;
 const PAUSA_FINNHUB_MS = 1_100; // el plan gratis de Finnhub permite ~60 llamadas por minuto
@@ -118,6 +120,7 @@ export async function ejecutarJobAprender(servicio: SupabaseClient) {
       paso.medidas = await medirSugerencias(servicio, usuarioId, hoy);
       paso.propuestaPesos = await proponerPesosDelMes(servicio, usuarioId, estado);
       paso.avisos = await enviarAvisosAprender(servicio, usuarioId);
+      paso.empresasFuertes = await enviarAvisosEmpresasFuertes(servicio, usuarioId);
     } catch (error) {
       paso.error = error instanceof Error ? error.message : "Error desconocido";
     }

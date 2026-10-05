@@ -50,7 +50,7 @@ export async function registrarSugerencia(servicio: SupabaseClient, usuarioId: s
   return data.id as string;
 }
 
-async function enviarPorCanales(servicio: SupabaseClient, usuarioId: string, texto: string) {
+export async function enviarPorCanales(servicio: SupabaseClient, usuarioId: string, texto: string) {
   const { data: vinculo } = await servicio.from("telegram_vinculos").select("chat_id").eq("usuario_id", usuarioId).maybeSingle();
   const resultados = await Promise.allSettled([
     enviarPush(servicio, usuarioId, { title: "Aprender", body: texto.split("\n").slice(0, 3).join(" ").slice(0, 280) }),
