@@ -45,3 +45,9 @@ export function validarPesos(entrada: Record<string, unknown>): { ok: true; peso
   if (valores.reduce((total, valor) => total + valor, 0) !== 100) return { ok: false, error: "Los pesos deben sumar 100" };
   return { ok: true, pesos: { peso_valuacion: valores[0], peso_momento: valores[1], peso_calidad: valores[2], peso_noticias: valores[3] } };
 }
+
+// Una compra de un activo de aprender se bloquea hasta que el usuario escriba su tesis. Ventas y dividendos no.
+export function compraBloqueadaPorTesis(activo: { ticker: string; bolsillo_clave?: string | null; tesis?: string | null }, tipoOperacion: string): string | null {
+  if (tipoOperacion !== "compra" || activo.bolsillo_clave !== "aprender" || !tesisPendiente(activo.tesis)) return null;
+  return `Antes de registrar una compra de ${activo.ticker}, escribí tu tesis en Plan → Aprender (Escribir tesis).`;
+}

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { compraBloqueadaPorTesis } from "./aprenderActivos";
 import { calcularCartera, type TipoOperacion } from "./rendimiento";
 
 export type EntradaOperacion = {
@@ -28,7 +29,7 @@ export async function registrarOperacion(
 
   let consulta = supabase
     .from("activos")
-    .select("id, ticker, nombre, tipo, en_politica")
+    .select("id, ticker, nombre, tipo, en_politica, bolsillo_clave, tesis")
     .eq("usuario_id", usuarioId)
     .eq("en_politica", true);
   consulta = entrada.activoId
@@ -36,6 +37,8 @@ export async function registrarOperacion(
     : consulta.eq("ticker", entrada.ticker!.trim().toUpperCase());
   const { data: activo } = await consulta.maybeSingle();
   if (!activo) throw new Error("Ese activo no está en tu política de inversión");
+  const bloqueo = compraBloqueadaPorTesis(activo, entrada.tipo);
+  if (bloqueo) throw new Error(bloqueo);
 
   const cantidad = entrada.tipo === "dividendo"
     ? 0

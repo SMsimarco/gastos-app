@@ -216,7 +216,7 @@ export function SeccionAprender() {
             <li key={activo.id} className="flex flex-col gap-1 rounded-xl border border-border-soft p-3 text-sm">
               <div className="flex items-baseline justify-between gap-2"><strong>{activo.ticker}</strong><span className="text-muted tabular-nums">{activo.valorPosicionUsd > 0 ? `${usd(activo.valorPosicionUsd)} · ${signo(activo.gananciaPct)}%` : "sin posición"}</span></div>
               {tesisPendiente(activo.tesis) ? (
-                <p className="rounded-lg border border-accent/40 bg-accent-soft p-2 text-xs">Falta tu tesis: escribí por qué querés {activo.ticker}. Hasta que la completes no es una tesis tuya.</p>
+                <p className="text-xs text-muted">Sin tesis todavía. La necesitás recién para registrar una compra.</p>
               ) : (
                 <p className="text-muted">{activo.tesis}</p>
               )}

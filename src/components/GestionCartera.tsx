@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { compraBloqueadaPorTesis } from "@/lib/inversiones/aprenderActivos";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type ActivoDisponible = {
@@ -8,6 +9,8 @@ type ActivoDisponible = {
   ticker: string;
   nombre: string;
   tipo: "etf" | "accion" | "cuenta_remunerada";
+  bolsillo_clave?: string | null;
+  tesis?: string | null;
 };
 
 type Cartera = {
@@ -128,7 +131,7 @@ export function GestionCartera({ carteraInicial }: { carteraInicial: Cartera }) 
 
         {mostrarFormulario && (
           <form onSubmit={registrarCompra} className="card grid grid-cols-2 gap-3 p-4">
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">Activo<select name="activo_id" required className="input-plan">{activosCompra.map((activo) => <option key={activo.id} value={activo.id}>{activo.ticker} · {activo.nombre}</option>)}</select></label>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">Activo<select name="activo_id" required className="input-plan">{activosCompra.map((activo) => { const sinTesis = compraBloqueadaPorTesis(activo, "compra") !== null; return <option key={activo.id} value={activo.id} disabled={sinTesis}>{activo.ticker} · {activo.nombre}{sinTesis ? " (falta tu tesis en Plan → Aprender)" : ""}</option>; })}</select></label>
             <label className="flex flex-col gap-1 text-xs text-muted">Monto total (US$)<input name="monto_usd" type="number" min="0.01" step="0.01" required className="input-plan" /></label>
             <label className="flex flex-col gap-1 text-xs text-muted">Precio unitario (US$)<input name="precio_usd" type="number" min="0.000001" step="0.000001" required className="input-plan" /></label>
             <label className="flex flex-col gap-1 text-xs text-muted">Comisión (US$)<input name="comision_usd" type="number" min="0" step="0.01" defaultValue="0" className="input-plan" /></label>
