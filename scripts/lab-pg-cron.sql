@@ -114,8 +114,9 @@ select cron.schedule('lab-cierre', '10 22 * * 1-5', $job$
 $job$);
 
 -- Asesor de aprender (Fase 7): medicion de sugerencias contra VOO, promedio de P/E, propuesta mensual de pesos y avisos.
--- Corre despues del cierre del laboratorio (lab-cierre 22:10 UTC).
-select cron.schedule('aprender-diario', '40 22 * * 1-5', $job$
+-- Corre despues de que el laboratorio guarda los indicadores del dia (lab-macro 22:30 UTC) y de las estadisticas
+-- (lab-aprendizaje 23:30 UTC), para que el resumen de empresas grandes use los datos de hoy.
+select cron.schedule('aprender-diario', '50 23 * * 1-5', $job$
   select net.http_get(
     url := 'https://gastosvoz.vercel.app/api/cron/aprender-diario',
     headers := jsonb_build_object('Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'lab_cron_secret')),

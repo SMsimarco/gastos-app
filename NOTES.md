@@ -301,3 +301,13 @@ Sección "Aprender" en la pestaña **Plan**, debajo de los bolsillos (ahí aplic
 ### Pendiente / límites
 - `usar_historial_bots` existe en `config_plan` (default `false`) pero **todavía no cambia el puntaje**: está reservado para cuando se decida usar las decisiones de los bots como señal.
 - Las consultas dependen de que el clasificador de Gemini las mande al flujo de inversiones; se le agregaron ejemplos al prompt, pero no está probado con mensajes reales.
+
+## Avisos de empresas grandes (2026-10-05, sin migración)
+
+Dentro del job diario de aprender (`empresasFuertes.ts` puro con tests y `empresasFuertesAvisos.ts` con los datos y el envío). Mira los activos de tu lista de aprender más VOO, con datos de `lab_indicadores`, `lab_noticias` y el calendario de balances (solo lectura; no hay recolección nueva).
+- **Resumen diario:** las 3 empresas que más se movieron en el día (para arriba o para abajo, de a 2% o más) con el movimiento del día y del mes, distancia al máximo del año, balance si es en 7 días o menos y una noticia, más la línea de VOO. Si ninguna se movió 2%, una sola línea: "Día tranquilo". Una vez por día de mercado (la clave usa la fecha de los datos, así que fines de semana y feriados no repiten).
+- **Alerta fuerte:** aviso aparte si una se mueve 5% en el día (8% para YPF y VIST), una vez por empresa y por día de datos. Solo informa: nunca dice comprar ni vender.
+- **VOO:** regla de la Fase 4 reutilizada (`caidaDesdeMaximoPct`, 10% o más desde el máximo de 52 semanas), como oportunidad de compra de largo plazo y nunca de venta. Una vez por semana y no si el aviso de mercado de la Fase 4 ya salió esa semana.
+- Todo termina con "Sugerencia según tu plan, no asesoramiento financiero." y usa `alertas_enviadas` (claves `fuertes-resumen:`, `fuertes-alerta:`, `fuertes-voo:`), reservando antes de enviar y liberando si falla.
+- El job `aprender-diario` se movió a las 23:50 UTC (después de que el laboratorio guarda los indicadores y las estadísticas) para que el resumen use los datos de ese día. El job de aprender de 22:40 que ya estaba agendado hay que reemplazarlo corriendo de nuevo el bloque de `scripts/lab-pg-cron.sql` (mismo nombre, actualiza).
+- **Límite:** el job corre una vez por día después del cierre, así que la alerta fuerte llega al terminar la rueda, no en el momento (eso sería la opción B).
