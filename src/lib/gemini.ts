@@ -109,6 +109,8 @@ Reglas de argot monetario argentino:
 - "un verde" = 1 USD (y en general "verdes" = dólares)
 - "facturas" (en contexto de compra de comida) son medialunas/pastelitos de panadería, NO boletas de servicios
 
+Gastos de cancha, gimnasio, club, fútbol, pádel, entradas a partidos o inscripciones deportivas van en la categoría "Deportes" si esa categoría está en la lista de abajo.
+
 Compras de comida que NO son supermercado ni delivery/restaurante (panadería, verdulería, carnicería, kiosco, almacén) van en categoria "Alimentos" si esa categoría está en la lista de abajo; si no existe, usá la más parecida de la lista. Poné en descripcion el detalle específico (ej. "facturas de panadería", "verdura", "fiambre") para poder diferenciar cada compra aunque compartan categoría.
 
 Cuotas: si mencionan pago en cuotas ("en 3 cuotas", "en 6 pagos", "lo pagué en 12"), poné ese número en cuotas. Si no dicen nada de cuotas, poné cuotas: 1. El monto que des es el TOTAL de la compra (no dividas vos por cuota, eso lo hace el sistema después).

@@ -4,6 +4,8 @@ import { useRef, useState, type TouchEvent } from "react";
 import { GraficoSemana } from "@/components/GraficoSemana";
 import { GraficosMes, type Kpis, type Gasto } from "@/components/GraficosMes";
 import { GraficoAnio } from "@/components/GraficoAnio";
+import { DashboardCategorias } from "@/components/DashboardCategorias";
+import type { FilaCategoriaSql } from "@/lib/dashboardCategorias";
 
 type Dia = { fecha: string; total_dia: number; acumulado: number };
 type CategoriaTotal = {
@@ -29,6 +31,7 @@ const PERIODOS = [
   { id: "semana", label: "Semana" },
   { id: "mes", label: "Mes" },
   { id: "anio", label: "Año" },
+  { id: "categorias", label: "Categorías" },
 ] as const;
 
 type Periodo = (typeof PERIODOS)[number]["id"];
@@ -37,6 +40,7 @@ export function ResumenSwitcher({
   semana,
   mes,
   anio,
+  categorias,
 }: {
   semana: { estaSemana: Dia[]; semanaAnterior: Dia[]; ultimosGastos: Gasto[] };
   mes: {
@@ -56,6 +60,7 @@ export function ResumenSwitcher({
     diario: Dia[];
     ultimosGastos: Gasto[];
   };
+  categorias: { mes: FilaCategoriaSql[]; anio: FilaCategoriaSql[]; todo: FilaCategoriaSql[] };
 }) {
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const inicioToque = useRef<{ x: number; y: number } | null>(null);
@@ -103,6 +108,7 @@ export function ResumenSwitcher({
       {periodo === "semana" && <GraficoSemana {...semana} />}
       {periodo === "mes" && <GraficosMes {...mes} />}
       {periodo === "anio" && <GraficoAnio {...anio} />}
+      {periodo === "categorias" && <DashboardCategorias datos={categorias} />}
     </div>
   );
 }

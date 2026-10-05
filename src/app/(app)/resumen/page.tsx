@@ -68,6 +68,8 @@ export default async function ResumenPage() {
     categoriaMensualAnio,
     diarioAnio,
     gastosAnio,
+    categoriasAnio,
+    categoriasTodo,
   ] = await Promise.all([
     supabase.rpc("gasto_acumulado_diario", { desde: toISO(lunesEsta), hasta: toISO(domingoEsta) }),
     supabase.rpc("gasto_acumulado_diario", { desde: toISO(lunesAnterior), hasta: toISO(domingoAnterior) }),
@@ -104,6 +106,8 @@ export default async function ResumenPage() {
       .order("fecha", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(10),
+    supabase.rpc("totales_por_categoria", { desde: `${anio}-01-01`, hasta: `${anio}-12-31`, tipo_filtro: "gasto" }),
+    supabase.rpc("totales_por_categoria", { desde: "2000-01-01", hasta: "2100-12-31", tipo_filtro: "gasto" }),
   ]);
 
   return (
@@ -131,6 +135,7 @@ export default async function ResumenPage() {
           diario: diarioAnio.data ?? [],
           ultimosGastos: (gastosAnio.data ?? []) as unknown as Gasto[],
         }}
+        categorias={{ mes: categoriasMes.data ?? [], anio: categoriasAnio.data ?? [], todo: categoriasTodo.data ?? [] }}
       />
     </main>
   );
