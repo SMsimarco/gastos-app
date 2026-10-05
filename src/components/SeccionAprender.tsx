@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PanelAprender } from "@/lib/inversiones/aprenderPanel";
 import type { Candidato, FilaFicha } from "@/lib/inversiones/aprender";
+import { tesisPendiente } from "@/lib/inversiones/aprenderActivos";
 
 const CRITERIOS: Array<{ clave: FilaFicha["criterio"]; nombre: string }> = [
   { clave: "valuacion", nombre: "Valuación" },
@@ -214,10 +215,14 @@ export function SeccionAprender() {
           {panel.activos.map((activo) => (
             <li key={activo.id} className="flex flex-col gap-1 rounded-xl border border-border-soft p-3 text-sm">
               <div className="flex items-baseline justify-between gap-2"><strong>{activo.ticker}</strong><span className="text-muted tabular-nums">{activo.valorPosicionUsd > 0 ? `${usd(activo.valorPosicionUsd)} · ${signo(activo.gananciaPct)}%` : "sin posición"}</span></div>
-              <p className="text-muted">{activo.tesis}</p>
+              {tesisPendiente(activo.tesis) ? (
+                <p className="rounded-lg border border-accent/40 bg-accent-soft p-2 text-xs">Falta tu tesis: escribí por qué querés {activo.ticker}. Hasta que la completes no es una tesis tuya.</p>
+              ) : (
+                <p className="text-muted">{activo.tesis}</p>
+              )}
               <p className="text-xs text-muted">Toma de ganancia: {activo.tomaGananciaPct ? `+${activo.tomaGananciaPct}%` : "—"} · Revisar tesis si baja: {activo.stopRevisionPct ? `${activo.stopRevisionPct}%` : "—"}{activo.conDatosDelLaboratorio ? "" : " · sin precio en el laboratorio"}</p>
               <div className="flex gap-3 text-xs">
-                <button onClick={() => { setEditando(activo.id); setForm({ ticker: activo.ticker, tesis: activo.tesis, tomaGananciaPct: activo.tomaGananciaPct?.toString() ?? "", stopRevisionPct: activo.stopRevisionPct?.toString() ?? "" }); }} className="text-muted hover:text-foreground">Editar</button>
+                <button onClick={() => { setEditando(activo.id); setForm({ ticker: activo.ticker, tesis: tesisPendiente(activo.tesis) ? "" : activo.tesis, tomaGananciaPct: activo.tomaGananciaPct?.toString() ?? "", stopRevisionPct: activo.stopRevisionPct?.toString() ?? "" }); }} className="text-muted hover:text-foreground">{tesisPendiente(activo.tesis) ? "Escribir tesis" : "Editar"}</button>
                 <button disabled={ocupado} onClick={() => { if (window.confirm(`¿Quitar ${activo.ticker} de tu lista de aprender?`)) void enviar(`/api/aprender/activos/${activo.id}`, "DELETE"); }} className="text-muted hover:text-danger">Quitar</button>
               </div>
             </li>
